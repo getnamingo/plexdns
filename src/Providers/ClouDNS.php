@@ -97,9 +97,9 @@ class ClouDNS implements DnsHostingProviderInterface {
             'host' => $rrsetData['subname'],
             'record-type' => $rrsetData['type'],
             'record' => implode("\n", $rrsetData['records']),
-	    'ttl' => $rrsetData['ttl'],
-	    'priority' =>  $rrsetData['priority']
-	]);
+            'ttl' => $rrsetData['ttl'],
+            'priority' =>  $rrsetData['priority']
+        ]);
         return json_decode($domainName, true);
     }
     
@@ -135,8 +135,7 @@ class ClouDNS implements DnsHostingProviderInterface {
 
         if (!$recordId) {
             throw new Exception("Record not found for modification");
-	}
-
+        }
 
         $response = $this->request('mod-record.json', [
             'domain-name' => $domainName,
@@ -144,12 +143,12 @@ class ClouDNS implements DnsHostingProviderInterface {
             'record-type' => $type,
             'host' => $subname,
             'record' => implode("\n", $rrsetData['records']),
-	    'ttl' => $rrsetData['ttl'],
-	    'priority' =>  $rrsetData['priority']
+            'ttl' => $rrsetData['ttl'],
+            'priority' =>  $rrsetData['priority']
         ]);
         return json_decode($domainName, true);
     }
-    
+
     public function modifyBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
     }

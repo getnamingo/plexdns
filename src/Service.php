@@ -275,8 +275,8 @@ class Service
                 $rrsetData['priority'] = $data['record_priority'];
             }
         }
-	
-	// Step 4: Create record in DNS provider
+
+        // Step 4: Create record in DNS provider
         try {
             $this->dnsProvider->createRRset($domainName, $rrsetData);
         } catch (Exception $e) {
@@ -296,13 +296,9 @@ class Service
             ':ttl' => (int) $data['record_ttl'],
             ':priority' => isset($data['record_priority']) ? (int) $data['record_priority'] : 0,
             ':created_at' => date('Y-m-d H:i:s'),
-	    ':updated_at' => date('Y-m-d H:i:s'),
-	    //':record_id' => $data['record_id'],
-	    ':record_id' => uniqid(), // Create a unique value
-
-	];
-
-	//die(var_dump($params));
+            ':updated_at' => date('Y-m-d H:i:s'),
+            ':record_id' => uniqid(),
+        ];
 
         try {
             $stmt = $this->db->prepare($insertQuery);
@@ -328,7 +324,7 @@ class Service
         }
 
         $domainName = $data['domain_name'];
-	$recordId = $data['record_id'];
+        $recordId = $data['record_id'];
 
         // Step 1: Fetch the domain configuration
         $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
@@ -356,8 +352,7 @@ class Service
             } else {
                 $rrsetData['priority'] = $data['record_priority'];
             }
-	}
-
+        }
 
         // Step 4: Update the record in the DNS provider
         try {
@@ -378,8 +373,7 @@ class Service
             ':updated_at' => date('Y-m-d H:i:s'),
             ':record_id' => $recordId,
             ':domain_id' => $domain[0]['id'],
-	];
-
+        ];
 
         try {
             $this->executeQuery($updateQuery, $updateParams);
