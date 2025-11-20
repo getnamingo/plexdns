@@ -129,7 +129,7 @@ function getRecordId(PDO $pdo, string $domainName, string $type, string $subname
     $record = $stmtRecord->fetch(PDO::FETCH_ASSOC);
 
     if (!$record) {
-        throw new \Exception("Error: No record found with name '$subname' and type '$type'");
+        throw new \Exception("Error: No record found with name '$subname' and type '$type' for domain '$domainName'");
     }
 
     return $record['recordId'];

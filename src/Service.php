@@ -7,7 +7,7 @@ use Exception;
 
 class Service
 {
-    protected ?PDO $db = null;
+    protected ?PDO $db;
     private $dnsProvider;
 
     /**
@@ -236,10 +236,10 @@ class Service
      * Adds a DNS record for a specified domain.
      *
      * @param array $data An array containing the necessary information for adding a DNS record.
-     * @return bool Returns true on successful addition of the DNS record.
+     * @return int Returns the database ID of the DNS record.
      * @throws Exception If the domain does not exist or an error occurs.
      */
-    public function addRecord(array $data): bool
+    public function addRecord(array $data): int
     {
         // Validate data configuration
         if (!$data || !isset($data['domain_name'])) {
@@ -487,7 +487,8 @@ class Service
                     `config` TEXT NOT NULL,
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`)
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `uniq_domain_name` (`domain_name`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             ';
 
@@ -512,12 +513,13 @@ class Service
                 CREATE TABLE IF NOT EXISTS zones (
                     id BIGSERIAL PRIMARY KEY,
                     client_id BIGINT NOT NULL,
-                    domain_name VARCHAR(75),
+                    domain_name VARCHAR(75) NOT NULL,
                     provider_id VARCHAR(11),
                     zoneId VARCHAR(100) DEFAULT NULL,
                     config TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uniq_domain_name UNIQUE (domain_name)
                 );
             ';
 
@@ -590,8 +592,8 @@ class Service
      */
     public function uninstall(): bool
     {
-        $sqlRecords = 'DROP TABLE IF EXISTS `records`';
-        $sqlZones = 'DROP TABLE IF EXISTS `zones`';
+        $sqlRecords = 'DROP TABLE IF EXISTS records';
+        $sqlZones = 'DROP TABLE IF EXISTS zones';
 
         try {
             $this->db->exec($sqlRecords);
@@ -609,10 +611,17 @@ class Service
      *
      * @throws Exception If an error occurs during the cron job.
      */
-    public function onCronRun(): void
+    public function onCronRun(array $data): void
     {
-        $configArray = null;
-        $this->chooseDnsProvider($configArray);
+        // Validate the input
+        if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
+            throw new Exception("Domain name or record ID is missing.");
+        }
+
+        $domainName = $data['domain_name'];
+        $recordId = $data['record_id'];
+
+        $this->chooseDnsProvider($data);
 
         if ($this->dnsProvider === null) {
             throw new \Exception("DNS provider is not set.");
@@ -621,6 +630,10 @@ class Service
         // Step 1: Fetch all domains from the database
         $sqlFetchDomains = 'SELECT * FROM zones';
         $domains = $this->fetchData($sqlFetchDomains);
+
+        if (!$domains) {
+            return;
+        }
 
         foreach ($domains as $domain) {
             $domainName = $domain['domain_name'];
