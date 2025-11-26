@@ -97,27 +97,27 @@ class Service
         // Extract domain configuration
         $config = json_decode($order['config'], true);
         if (!$config || !isset($config['domain_name'])) {
-            throw new Exception("Invalid configuration: domain name missing.");
+            throw new \RuntimeException("Invalid configuration: domain name missing.");
         }
 
         $domainName = $config['domain_name'];
         $clientId = $order['client_id'] ?? null;
 
         if (!$clientId) {
-            throw new Exception("Client ID is missing.");
+            throw new \RuntimeException("Client ID is missing.");
         }
 
         // Set up DNS provider
         $this->chooseDnsProvider($config);
         if ($this->dnsProvider === null) {
-            throw new Exception("DNS provider is not set.");
+            throw new \RuntimeException("DNS provider is not set.");
         }
 
         // Step 1: Create domain in DNS
         try {
             $this->dnsProvider->createDomain($domainName);
-        } catch (Exception $e) {
-            throw new Exception("Failed to create domain in DNS: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to create domain in DNS: " . $e->getMessage());
         }
 
         // Step 2: Save domain in the database
@@ -149,7 +149,7 @@ class Service
                     updated_at = excluded.updated_at
             ";
         } else {
-            throw new Exception("Unsupported database type: $dbDriver");
+            throw new \RuntimeException("Unsupported database type: $dbDriver");
         }
 
         $params = [
@@ -162,8 +162,8 @@ class Service
 
         try {
             $this->executeQuery($query, $params);
-        } catch (Exception $e) {
-            throw new Exception("Failed to save domain in the database: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to save domain in the database: " . $e->getMessage());
         }
 
         return [
@@ -178,7 +178,7 @@ class Service
         // Validate order configuration
         $config = json_decode($order['config'], true);
         if (!$config || !isset($config['domain_name'])) {
-            throw new Exception("Invalid configuration: domain name missing.");
+            throw new \RuntimeException("Invalid configuration: domain name missing.");
         }
 
         $domainName = $config['domain_name'];
@@ -186,19 +186,19 @@ class Service
         // Set up DNS provider
         $this->chooseDnsProvider($config);
         if ($this->dnsProvider === null) {
-            throw new Exception("DNS provider is not set.");
+            throw new \RuntimeException("DNS provider is not set.");
         }
 
         // Step 1: Delete domain in DNS
         try {
             $this->dnsProvider->deleteDomain($domainName);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             if (strpos($e->getMessage(), 'Not Found') !== false) {
                 // Log and continue if domain does not exist
                 error_log("Domain $domainName not found in DNS provider, but proceeding with deletion.");
             } else {
                 // Rethrow other exceptions
-                throw new Exception("Failed to delete domain $domainName in DNS: " . $e->getMessage());
+                throw new \RuntimeException("Failed to delete domain $domainName in DNS: " . $e->getMessage());
             }
         }
 
@@ -213,7 +213,7 @@ class Service
             $domainId = $result[0]['id'] ?? null;
 
             if (!$domainId) {
-                throw new Exception("Domain $domainName not found in the database.");
+                throw new \RuntimeException("Domain $domainName not found in the database.");
             }
 
             $query = "DELETE FROM records WHERE domain_id = :domain_id";
@@ -226,9 +226,9 @@ class Service
 
             $this->db->commit(); 
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->db->rollback();
-            throw new Exception("Failed to delete domain $domainName and its records: " . $e->getMessage());
+            throw new \RuntimeException("Failed to delete domain $domainName and its records: " . $e->getMessage());
         }
     }
 
@@ -237,13 +237,13 @@ class Service
      *
      * @param array $data An array containing the necessary information for adding a DNS record.
      * @return int Returns the database ID of the DNS record.
-     * @throws Exception If the domain does not exist or an error occurs.
+     * @throws \RuntimeException If the domain does not exist or an error occurs.
      */
     public function addRecord(array $data): int
     {
         // Validate data configuration
         if (!$data || !isset($data['domain_name'])) {
-            throw new Exception("Invalid configuration: domain name missing.");
+            throw new \RuntimeException("Invalid configuration: domain name missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -251,12 +251,12 @@ class Service
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
-            throw new Exception("Domain does not exist.");
+            throw new \RuntimeException("Domain does not exist.");
         }
 
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
-            throw new Exception("DNS provider is not set.");
+            throw new \RuntimeException("DNS provider is not set.");
         }
 
         // Step 3: Prepare RRset data for DNS provider
@@ -279,8 +279,8 @@ class Service
         // Step 4: Create record in DNS provider
         try {
             $this->dnsProvider->createRRset($domainName, $rrsetData);
-        } catch (Exception $e) {
-            throw new Exception("Failed to add DNS record: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to add DNS record: " . $e->getMessage());
         }
 
         // Step 5: Add record to the database
@@ -304,23 +304,23 @@ class Service
             $stmt = $this->db->prepare($insertQuery);
             $stmt->execute($params);
             return (int) $this->db->lastInsertId();
-        } catch (Exception $e) {
-            throw new Exception("Failed to add DNS record to the database: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to add DNS record to the database: " . $e->getMessage());
         }
     }
-    
+
     /**
      * Updates a DNS record for a specified domain.
      *
      * @param array $data An array containing the necessary information for updating a DNS record.
      * @return bool Returns true on successful update of the DNS record.
-     * @throws Exception If the domain or record does not exist or an error occurs.
+     * @throws \RuntimeException If the domain or record does not exist or an error occurs.
      */
     public function updateRecord(array $data): bool
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new Exception("Domain name or record ID is missing.");
+            throw new \RuntimeException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -331,13 +331,13 @@ class Service
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
-            throw new Exception("Domain does not exist.");
+            throw new \RuntimeException("Domain does not exist.");
         }
 
         // Step 2: Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
-            throw new Exception("DNS provider is not set.");
+            throw new \RuntimeException("DNS provider is not set.");
         }
 
         // Step 3: Prepare the RRset data for the DNS provider
@@ -357,8 +357,8 @@ class Service
         // Step 4: Update the record in the DNS provider
         try {
             $this->dnsProvider->modifyRRset($domainName, $data['record_name'], $data['record_type'], $rrsetData);
-        } catch (Exception $e) {
-            throw new Exception("Failed to update DNS record: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to update DNS record: " . $e->getMessage());
         }
 
         // Step 5: Update the record in the database
@@ -389,8 +389,8 @@ class Service
             ];
 
             $this->executeQuery($zoneUpdateQuery, $zoneUpdateParams);
-        } catch (Exception $e) {
-            throw new Exception("Failed to update DNS record in the database: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to update DNS record in the database: " . $e->getMessage());
         }
 
         return true;
@@ -401,13 +401,13 @@ class Service
      *
      * @param array $data An array containing the identification information of the DNS record to be deleted.
      * @return bool Returns true if the DNS record was successfully deleted.
-     * @throws Exception If the domain or record does not exist or an error occurs.
+     * @throws \RuntimeException If the domain or record does not exist or an error occurs.
      */
     public function delRecord(array $data): bool
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new Exception("Domain name or record ID is missing.");
+            throw new \RuntimeException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -418,20 +418,20 @@ class Service
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
-            throw new Exception("Domain does not exist.");
+            throw new \RuntimeException("Domain does not exist.");
         }
 
         // Step 2: Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
-            throw new Exception("DNS provider is not set.");
+            throw new \RuntimeException("DNS provider is not set.");
         }
 
         // Step 3: Delete the record from the DNS provider
         try {
             $this->dnsProvider->deleteRRset($domainName, $data['record_name'], $data['record_type'], $data['record_value']);
-        } catch (Exception $e) {
-            throw new Exception("Failed to delete DNS record from the provider: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to delete DNS record from the provider: " . $e->getMessage());
         }
 
         // Step 4: Delete the record from the database
@@ -458,8 +458,8 @@ class Service
             ];
 
             $this->executeQuery($zoneUpdateQuery, $zoneUpdateParams);
-        } catch (Exception $e) {
-            throw new Exception("Failed to delete DNS record from the database: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            throw new \RuntimeException("Failed to delete DNS record from the database: " . $e->getMessage());
         }
 
         return true;
