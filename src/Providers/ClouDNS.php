@@ -124,7 +124,7 @@ class ClouDNS implements DnsHostingProviderInterface {
     }
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
-        if (empty($domainName) || empty($subname) || empty($type) || empty($rrsetData['ttl']) || empty($rrsetData['records'])) {
+        if (empty($domainName) || empty($type) || empty($rrsetData['ttl']) || empty($rrsetData['records'])) {
             throw new Exception("Missing data for modifying RRset");
         }
 
@@ -170,7 +170,7 @@ class ClouDNS implements DnsHostingProviderInterface {
     }
 
     public function deleteRRset($domainName, $subname, $type, $value) {
-        if (empty($domainName) || empty($subname) || empty($type) || empty($value)) {
+        if (empty($domainName) || empty($type) || empty($value)) {
             throw new Exception("Missing data for deleting RRset");
         }
 
@@ -181,7 +181,11 @@ class ClouDNS implements DnsHostingProviderInterface {
 
         $recordId = null;
         foreach ($records as $record) {
-            if ($record['host'] === $subname && $record['type'] === $type && $record['record'] === $value) {
+                if (
+                    $record['host'] === $subname &&
+                    $record['type'] === $type &&
+                    trim($record['record'], '"') === trim($value, '"')
+                ) {
                 $recordId = $record['id'];
                 break;
             }
