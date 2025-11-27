@@ -95,6 +95,8 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
+        $subname = $subname ?: '@';
+
         $response = $this->client->request('PATCH', $domainName . '/rrsets/' . $subname . '/' . $type . '/', [
             'headers' => $this->headers,
             'json' => $rrsetData
@@ -113,6 +115,8 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function deleteRRset($domainName, $subname, $type, $value = null) {
+        $subname = $subname ?: '@';
+
         $response = $this->client->request('DELETE', $domainName . '/rrsets/' . $subname . '/' . $type . '/', ['headers' => $this->headers]);
         return $response->getStatusCode() === 204;
     }
