@@ -62,7 +62,7 @@ class Vultr implements DnsHostingProviderInterface {
             throw new \Exception("Error deleting domain: " . $e->getMessage());
         }
     }
-    
+
     public function createRRset($domainName, $rrsetData) {
         try {
             $record = new Record();
@@ -76,10 +76,10 @@ class Vultr implements DnsHostingProviderInterface {
             if (isset($rrsetData['records'])) {
                 $record->setData($rrsetData['records'][0]);
             }
-            if (isset($rrsetData['priority'])) {
-                $record->setPriority($rrsetData['priority']);
-            } else {
-                $record->setPriority(0);
+            $type = strtoupper($rrsetData['type']);
+            if (in_array($type, ['MX', 'SRV'], true)) {
+                $priority = isset($rrsetData['priority']) ? (int)$rrsetData['priority'] : 10;
+                $record->setPriority($priority);
             }
             if (isset($rrsetData['ttl'])) {
                 $record->setTtl($rrsetData['ttl']);
@@ -164,6 +164,8 @@ class Vultr implements DnsHostingProviderInterface {
     public function deleteRRset($domainName, $subname, $type, $value) {
         try {
             $records = $this->client->dns->getRecords($domainName);
+            $recordId = null;
+
             foreach ($records as $record) {
                 if ($record instanceof \Vultr\VultrPhp\Services\DNS\Record) {
                     if ($type === 'MX') {
