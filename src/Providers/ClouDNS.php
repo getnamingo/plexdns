@@ -92,14 +92,22 @@ class ClouDNS implements DnsHostingProviderInterface {
             throw new Exception("Missing data for creating RRset");
         }
 
-        $response = $this->request('add-record.json', [
+        $params = [
             'domain-name' => $domainName,
-            'host' => $rrsetData['subname'],
+            'host'        => $rrsetData['subname'],
             'record-type' => $rrsetData['type'],
-            'record' => implode("\n", $rrsetData['records']),
-            'ttl' => $rrsetData['ttl'],
-            'priority' =>  $rrsetData['priority']
-        ]);
+            'record'      => implode("\n", $rrsetData['records']),
+            'ttl'         => (int)$rrsetData['ttl'],
+        ];
+
+        if (strtoupper($rrsetData['type']) === 'MX') {
+            $params['priority'] = isset($rrsetData['priority'])
+                ? (int)$rrsetData['priority']
+                : 10; // sensible default
+        }
+
+        $response = $this->request('add-record.json', $params);
+
         return json_decode($domainName, true);
     }
     
@@ -137,15 +145,23 @@ class ClouDNS implements DnsHostingProviderInterface {
             throw new Exception("Record not found for modification");
         }
 
-        $response = $this->request('mod-record.json', [
+        $params = [
             'domain-name' => $domainName,
-            'record-id' => $recordId,
+            'record-id'   => $recordId,
             'record-type' => $type,
-            'host' => $subname,
-            'record' => implode("\n", $rrsetData['records']),
-            'ttl' => $rrsetData['ttl'],
-            'priority' =>  $rrsetData['priority']
-        ]);
+            'host'        => $subname,
+            'record'      => implode("\n", $rrsetData['records']),
+            'ttl'         => (int)$rrsetData['ttl'],
+        ];
+
+        if (strtoupper($type) === 'MX') {
+            $params['priority'] = isset($rrsetData['priority'])
+                ? (int)$rrsetData['priority']
+                : 10; // default
+        }
+
+        $response = $this->request('mod-record.json', $params);
+
         return json_decode($domainName, true);
     }
 
