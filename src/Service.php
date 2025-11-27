@@ -575,7 +575,7 @@ class Service
                 if (empty($records)) {
                     // No values left => delete the whole RRset at provider
                     if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                        $this->dnsProvider->deleteRRset($domainName, $host, $type, null);
+                        $this->dnsProvider->deleteRRset($domainName, $host, $type, $data['record_value'] ?? null);
                     } else {
                         // Fallback: send empty records array
                         $this->dnsProvider->modifyRRset($domainName, $host, $type, [
@@ -598,7 +598,7 @@ class Service
             // Default behaviour: delete whole RRset for non-deSEC or non-multi types
             try {
                 if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                    $this->dnsProvider->deleteRRset($domainName, $host, $type, null);
+                    $this->dnsProvider->deleteRRset($domainName, $host, $type, $data['record_value'] ?? null);
                 } else {
                     // Or however you previously deleted a record for other providers
                     $this->dnsProvider->modifyRRset($domainName, $host, $type, [

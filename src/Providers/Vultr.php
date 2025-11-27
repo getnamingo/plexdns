@@ -183,7 +183,7 @@ class Vultr implements DnsHostingProviderInterface {
                     }
                 }
             }
-            
+
             if ($recordId === null) {
                 throw new \Exception("Error: No record found with name '$subname' and type '$type'");
             }
