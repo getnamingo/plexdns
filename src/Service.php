@@ -249,6 +249,7 @@ class Service
         $domainName = $data['domain_name'];
         $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
+        $domainId   = $domain[0]['id'];
 
         if (!$domain) {
             throw new \RuntimeException("Domain does not exist.");
@@ -276,9 +277,57 @@ class Service
             }
         }
 
+        $useModify = false;
+
+        if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['TXT', 'MX'], true)) {
+            // Fetch existing records for same host + type
+            $existing = $this->fetchData(
+                "SELECT value, priority FROM records
+                 WHERE domain_id = :domain_id AND type = :type AND host = :host",
+                [
+                    ':domain_id' => $domainId,
+                    ':type'      => $data['record_type'],
+                    ':host'      => $data['record_name'],
+                ]
+            );
+
+            if (!empty($existing)) {
+                $records = [];
+
+                foreach ($existing as $row) {
+                    if ($data['record_type'] === 'MX') {
+                        $records[] = (int)$row['priority'] . ' ' . $row['value'];
+                    } else {
+                        $records[] = $row['value'];
+                    }
+                }
+
+                // Add the new value
+                if ($data['record_type'] === 'MX') {
+                    $records[] = (int)$data['record_priority'] . ' ' . $data['record_value'];
+                } else {
+                    $records[] = $data['record_value'];
+                }
+
+                // Remove duplicates, normalize indexes
+                $rrsetData['records'] = array_values(array_unique($records));
+
+                $useModify = true;
+            }
+        }
+
         // Step 4: Create record in DNS provider
         try {
-            $this->dnsProvider->createRRset($domainName, $rrsetData);
+            if ($useModify) {
+                $this->dnsProvider->modifyRRset(
+                    $domainName,
+                    $data['record_name'],
+                    $data['record_type'],
+                    $rrsetData
+                );
+            } else {
+                $this->dnsProvider->createRRset($domainName, $rrsetData);
+            }
         } catch (\Throwable $e) {
             throw new \RuntimeException("Failed to add DNS record: " . $e->getMessage());
         }
@@ -289,7 +338,7 @@ class Service
             VALUES (:domain_id, :type, :host, :value, :ttl, :priority, :created_at, :updated_at, :record_id)
         ";
         $params = [
-            ':domain_id' => $domain[0]['id'],
+            ':domain_id' => $domainId,
             ':type' => $data['record_type'],
             ':host' => $data['record_name'],
             ':value' => $data['record_value'],
@@ -326,7 +375,7 @@ class Service
         $domainName = $data['domain_name'];
         $recordId = $data['record_id'];
 
-        // Step 1: Fetch the domain configuration
+        // Fetch the domain configuration
         $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
@@ -334,50 +383,109 @@ class Service
             throw new \RuntimeException("Domain does not exist.");
         }
 
-        // Step 2: Set up the DNS provider
+        $domainId = $domain[0]['id'];
+
+        // Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
             throw new \RuntimeException("DNS provider is not set.");
         }
 
-        // Step 3: Prepare the RRset data for the DNS provider
-        $rrsetData = [
-            'ttl' => (int) $data['record_ttl'],
-            'records' => [$data['record_value']],
-        ];
+        $type = $data['record_type'];
+        $host = $data['record_name'];
 
-        if ($data['record_type'] === 'MX') {
-            if ($data['provider'] === 'Desec') {
-                $rrsetData['records'] = [$data['record_priority'] . ' ' . $data['record_value']];
-            } else {
-                $rrsetData['priority'] = $data['record_priority'];
+        // deSEC handling (TXT/MX)
+        if ($data['provider'] === 'Desec' && in_array($type, ['TXT', 'MX'], true)) {
+            // Fetch all rows for this RRset
+            $rows = $this->fetchData(
+                "SELECT recordId, value, priority
+                 FROM records
+                 WHERE domain_id = :domain_id AND type = :type AND host = :host",
+                [
+                    ':domain_id' => $domainId,
+                    ':type'      => $type,
+                    ':host'      => $host,
+                ]
+            );
+
+            if (!$rows) {
+                throw new \RuntimeException("RRset not found for update.");
+            }
+
+            $records = [];
+            foreach ($rows as $row) {
+                if ($row['recordId'] === $recordId) {
+                    // This is the one being edited – use the NEW value
+                    if ($type === 'MX') {
+                        $records[] = (int)$data['record_priority'] . ' ' . $data['record_value'];
+                    } else {
+                        $records[] = $data['record_value'];
+                    }
+                } else {
+                    // Keep existing values for other rows
+                    if ($type === 'MX') {
+                        $records[] = (int)$row['priority'] . ' ' . $row['value'];
+                    } else {
+                        $records[] = $row['value'];
+                    }
+                }
+            }
+
+            $records = array_values(array_unique($records));
+
+            $rrsetData = [
+                'ttl'     => (int)$data['record_ttl'],
+                'records' => $records,
+            ];
+
+            try {
+                $this->dnsProvider->modifyRRset($domainName, $host, $type, $rrsetData);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to update DNS record: " . $e->getMessage());
+            }
+        } else {
+            // Default behaviour for other providers/types
+            $rrsetData = [
+                'ttl'     => (int)$data['record_ttl'],
+                'records' => [$data['record_value']],
+            ];
+
+            if ($type === 'MX') {
+                if ($data['provider'] === 'Desec') {
+                    $rrsetData['records'] = [$data['record_priority'] . ' ' . $data['record_value']];
+                } else {
+                    $rrsetData['priority'] = $data['record_priority'];
+                }
+            }
+
+            try {
+                $this->dnsProvider->modifyRRset($domainName, $host, $type, $rrsetData);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to update DNS record: " . $e->getMessage());
             }
         }
 
-        // Step 4: Update the record in the DNS provider
-        try {
-            $this->dnsProvider->modifyRRset($domainName, $data['record_name'], $data['record_type'], $rrsetData);
-        } catch (\Throwable $e) {
-            throw new \RuntimeException("Failed to update DNS record: " . $e->getMessage());
-        }
-
-        // Step 5: Update the record in the database
+        // Update the record in the database
         $updateQuery = "
             UPDATE records
-            SET ttl = :ttl, value = :value, updated_at = :updated_at
+            SET ttl = :ttl,
+                value = :value,
+                priority = :priority,
+                updated_at = :updated_at
             WHERE recordId = :record_id AND domain_id = :domain_id
         ";
         $updateParams = [
-            ':ttl' => (int) $data['record_ttl'],
-            ':value' => $data['record_value'],
+            ':ttl'        => (int)$data['record_ttl'],
+            ':value'      => $data['record_value'],
+            ':priority'   => isset($data['record_priority']) ? (int)$data['record_priority'] : 0,
             ':updated_at' => date('Y-m-d H:i:s'),
-            ':record_id' => $recordId,
-            ':domain_id' => $domain[0]['id'],
+            ':record_id'  => $recordId,
+            ':domain_id'  => $domainId,
         ];
 
         try {
             $this->executeQuery($updateQuery, $updateParams);
-            
+
             $zoneUpdateQuery = "
                 UPDATE zones
                 SET updated_at = :updated_at
@@ -385,7 +493,7 @@ class Service
             ";
             $zoneUpdateParams = [
                 ':updated_at' => date('Y-m-d H:i:s'),
-                ':domain_id' => $domain[0]['id'],
+                ':domain_id'  => $domainId,
             ];
 
             $this->executeQuery($zoneUpdateQuery, $zoneUpdateParams);
@@ -412,8 +520,10 @@ class Service
 
         $domainName = $data['domain_name'];
         $recordId = $data['record_id'];
+        $type = $data['record_type'];
+        $host = $data['record_name'];
 
-        // Step 1: Fetch the domain configuration
+        // Fetch the domain configuration
         $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
@@ -421,32 +531,99 @@ class Service
             throw new \RuntimeException("Domain does not exist.");
         }
 
-        // Step 2: Set up the DNS provider
+        $domainId = $domain[0]['id'];
+
+        // Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
             throw new \RuntimeException("DNS provider is not set.");
         }
 
-        // Step 3: Delete the record from the DNS provider
-        try {
-            $this->dnsProvider->deleteRRset($domainName, $data['record_name'], $data['record_type'], $data['record_value']);
-        } catch (\Throwable $e) {
-            throw new \RuntimeException("Failed to delete DNS record from the provider: " . $e->getMessage());
+        // deSEC multi-value delete (TXT/MX)
+        if ($data['provider'] === 'Desec' && in_array($type, ['TXT', 'MX'], true)) {
+            // Fetch all rows for this RRset
+            $rows = $this->fetchData(
+                "SELECT recordId, value, priority
+                 FROM records
+                 WHERE domain_id = :domain_id AND type = :type AND host = :host",
+                [
+                    ':domain_id' => $domainId,
+                    ':type'      => $type,
+                    ':host'      => $host,
+                ]
+            );
+
+            if (!$rows) {
+                throw new \RuntimeException("RRset not found for delete.");
+            }
+
+            $records = [];
+            foreach ($rows as $row) {
+                // Skip the one being deleted
+                if ($row['recordId'] === $recordId) {
+                    continue;
+                }
+
+                if ($type === 'MX') {
+                    $records[] = (int)$row['priority'] . ' ' . $row['value'];
+                } else {
+                    $records[] = $row['value'];
+                }
+            }
+
+            try {
+                if (empty($records)) {
+                    // No values left => delete the whole RRset at provider
+                    if (method_exists($this->dnsProvider, 'deleteRRset')) {
+                        $this->dnsProvider->deleteRRset($domainName, $host, $type, null);
+                    } else {
+                        // Fallback: send empty records array
+                        $this->dnsProvider->modifyRRset($domainName, $host, $type, [
+                            'ttl'     => (int)($data['record_ttl'] ?? 3600),
+                            'records' => [],
+                        ]);
+                    }
+                } else {
+                    // Still values left => modify RRset with remaining values
+                    $rrsetData = [
+                        'ttl'     => (int)($data['record_ttl'] ?? 3600),
+                        'records' => array_values(array_unique($records)),
+                    ];
+                    $this->dnsProvider->modifyRRset($domainName, $host, $type, $rrsetData);
+                }
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to delete DNS record: " . $e->getMessage());
+            }
+        } else {
+            // Default behaviour: delete whole RRset for non-deSEC or non-multi types
+            try {
+                if (method_exists($this->dnsProvider, 'deleteRRset')) {
+                    $this->dnsProvider->deleteRRset($domainName, $host, $type, null);
+                } else {
+                    // Or however you previously deleted a record for other providers
+                    $this->dnsProvider->modifyRRset($domainName, $host, $type, [
+                        'ttl'     => (int)($data['record_ttl'] ?? 3600),
+                        'records' => [],
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to delete DNS record: " . $e->getMessage());
+            }
         }
 
-        // Step 4: Delete the record from the database
+        // DB: delete ONLY this one row
         $deleteQuery = "
             DELETE FROM records
             WHERE recordId = :record_id AND domain_id = :domain_id
         ";
         $deleteParams = [
             ':record_id' => $recordId,
-            ':domain_id' => $domain[0]['id'],
+            ':domain_id' => $domainId,
         ];
 
         try {
             $this->executeQuery($deleteQuery, $deleteParams);
-            
+
             $zoneUpdateQuery = "
                 UPDATE zones
                 SET updated_at = :updated_at
@@ -454,7 +631,7 @@ class Service
             ";
             $zoneUpdateParams = [
                 ':updated_at' => date('Y-m-d H:i:s'),
-                ':domain_id' => $domain[0]['id'],
+                ':domain_id'  => $domainId,
             ];
 
             $this->executeQuery($zoneUpdateQuery, $zoneUpdateParams);

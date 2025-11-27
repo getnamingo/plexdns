@@ -112,7 +112,7 @@ class Desec implements DnsHostingProviderInterface {
         return json_decode($response->getBody(), true);
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
+    public function deleteRRset($domainName, $subname, $type, $value = null) {
         $response = $this->client->request('DELETE', $domainName . '/rrsets/' . $subname . '/' . $type . '/', ['headers' => $this->headers]);
         return $response->getStatusCode() === 204;
     }
