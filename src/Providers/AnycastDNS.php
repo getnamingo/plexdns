@@ -9,6 +9,7 @@ use Exception;
 class AnycastDNS implements DnsHostingProviderInterface {
     private $client;
     private $apiKey;
+    private $serverId;
 
     public function __construct($config) {
         $this->apiKey = $config['apikey'] ?? null;
@@ -16,6 +17,8 @@ class AnycastDNS implements DnsHostingProviderInterface {
         if (empty($this->apiKey)) {
             throw new Exception("API key cannot be empty");
         }
+
+        $this->serverId = isset($config['serverid']) ? (int)$config['serverid'] : 0;
 
         $this->client = new Client([
             'base_uri' => 'https://api.anycastdns.app/',
@@ -49,8 +52,12 @@ class AnycastDNS implements DnsHostingProviderInterface {
             throw new Exception("Domain name cannot be empty");
         }
 
-        $params = ['name' => $domainName];
-        return $this->request('POST', 'domains', $params);
+        $params = [
+            'serverid' => $this->serverId,
+            'domains'  => [$domainName],
+        ];
+
+        return $this->request('POST', 'domains/', $params);
     }
 
     public function listDomains() {
@@ -86,12 +93,22 @@ class AnycastDNS implements DnsHostingProviderInterface {
             throw new Exception("Missing data for creating RRset");
         }
 
+        $subname = trim((string)$rrsetData['subname']) === '' ? '@' : $rrsetData['subname'];
+
+        $content = is_array($rrsetData['records'])
+            ? (string) reset($rrsetData['records'])
+            : (string) $rrsetData['records'];
+
         $params = [
-            'type' => strtoupper($rrsetData['type']),
-            'name' => $rrsetData['subname'],
-            'content' => $rrsetData['records'],
-            'ttl' => $rrsetData['ttl'],
+            'type'    => strtoupper($rrsetData['type']),
+            'name'    => $subname,
+            'content' => $content,
+            'ttl'     => (int) $rrsetData['ttl'],
         ];
+
+        if (in_array($params['type'], ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
+            $params['prio'] = (int) $rrsetData['priority'];
+        }
 
         return $this->request('POST', "dns/{$domainName}/record", $params);
     }
@@ -108,17 +125,58 @@ class AnycastDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function modifyRRset($domainName, $subname, $type, $rrsetData) {
-        if (empty($domainName) || empty($subname) || empty($type) || empty($rrsetData['ttl']) || empty($rrsetData['records'])) {
+    public function modifyRRset($domainName, $subname, $type, $rrsetData)
+    {
+        if (empty($domainName) || empty($type) || empty($rrsetData['ttl']) || empty($rrsetData['records'])) {
             throw new Exception("Missing data for modifying RRset");
         }
 
+        $name = trim((string)$subname) === '' ? '@' : $subname;
+
+        $content = is_array($rrsetData['records'])
+            ? (string) reset($rrsetData['records'])
+            : (string) $rrsetData['records'];
+
+        $lookupContent = (isset($rrsetData['old_value']) && $rrsetData['old_value'] !== '')
+            ? (string) $rrsetData['old_value']
+            : $content;
+
+        $all = $this->request('GET', "dns/{$domainName}");
+        $records = isset($all['records']) ? $all['records'] : $all;
+
+        $recordId = null;
+
+        foreach ($records as $rec) {
+            $recName = isset($rec['name']) ? $rec['name'] : '';
+            $recNameNorm = ($recName === '' || $recName === '@') ? '@' : $recName;
+
+            if (
+                strtoupper($rec['type'] ?? '') === strtoupper($type) &&
+                $recNameNorm === $name &&
+                isset($rec['content']) &&
+                $rec['content'] === $lookupContent
+            ) {
+                $recordId = $rec['id'] ?? null;
+                if ($recordId !== null) {
+                    break;
+                }
+            }
+        }
+
+        if ($recordId === null) {
+            throw new Exception("No matching record found for {$name}.{$domainName} ({$type})");
+        }
+
         $params = [
-            'type' => strtoupper($type),
-            'name' => $subname,
-            'content' => $rrsetData['records'],
-            'ttl' => $rrsetData['ttl'],
+            'type'    => strtoupper($type),
+            'name'    => $name,
+            'content' => $content,
+            'ttl'     => (int) $rrsetData['ttl'],
         ];
+
+        if (in_array(strtoupper($type), ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
+            $params['prio'] = (int) $rrsetData['priority'];
+        }
 
         return $this->request('PUT', "dns/{$domainName}/record/{$recordId}", $params);
     }
@@ -127,9 +185,39 @@ class AnycastDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
-        if (empty($domainName) || empty($subname) || empty($type) || empty($value)) {
+    public function deleteRRset($domainName, $subname, $type, $value)
+    {
+        if (empty($domainName) || empty($type) || empty($value)) {
             throw new Exception("Missing data for deleting RRset");
+        }
+
+        $name = trim((string)$subname) === '' ? '@' : $subname;
+
+        $all = $this->request('GET', "dns/{$domainName}");
+        $records = isset($all['records']) ? $all['records'] : $all;
+
+        $recordId = null;
+
+        foreach ($records as $rec) {
+
+            $recName = isset($rec['name']) ? $rec['name'] : '';
+            $recNameNorm = ($recName === '' || $recName === '@') ? '@' : $recName;
+
+            if (
+                strtoupper($rec['type'] ?? '') === strtoupper($type) &&
+                $recNameNorm === $name &&
+                isset($rec['content']) &&
+                $rec['content'] === $value
+            ) {
+                $recordId = $rec['id'] ?? null;
+                if ($recordId !== null) {
+                    break;
+                }
+            }
+        }
+
+        if ($recordId === null) {
+            throw new Exception("Record not found for {$name}.{$domainName} ($type = $value)");
         }
 
         return $this->request('DELETE', "dns/{$domainName}/record/{$recordId}");
