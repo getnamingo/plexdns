@@ -57,7 +57,7 @@ class Vultr implements DnsHostingProviderInterface {
 
         try {
             $response = $this->client->dns->deleteDomain($domainName);
-            return json_decode($response->getDomain(), true);
+            return true;
         } catch (\Exception $e) {
             throw new \Exception("Error deleting domain: " . $e->getMessage());
         }
@@ -104,53 +104,65 @@ class Vultr implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function modifyRRset($domainName, $subname, $type, $rrsetData) {
+    public function modifyRRset($domainName, $subname, $type, $rrsetData)
+    {
         try {
-            $records = $this->client->dns->getRecords($domainName);
-            foreach ($records as $record) {
-                if ($record instanceof \Vultr\VultrPhp\Services\DNS\Record) {
-                    if ($type === 'MX') {
-                        // For MX records, compare type, and data
-                        if ($record->getType() === $type && $record->getData() === $rrsetData['records'][0]) {
-                            $recordId = $record->getId();
-                            break; // Stop the loop once the record is found
-                        }
-                    } else {
-                        // For non-MX records, compare only name and type
-                        if ($record->getName() === $subname && $record->getType() === $type) {
-                            $recordId = $record->getId();
-                            break; // Stop the loop once the record is found
-                        }
-                    }
-                }
+            $subname = $subname ?? '';
+            $lookupData = $rrsetData['old_value'] ?? ($rrsetData['records'][0] ?? null);
+
+            if ($lookupData === null) {
+                throw new \Exception("No value provided to locate record.");
             }
-            
+
+            $records  = $this->client->dns->getRecords($domainName);
+            $recordId = null;
+
+            foreach ($records as $record) {
+                if (!$record instanceof Record) {
+                    continue;
+                }
+
+                if ($record->getType() !== $type) {
+                    continue;
+                }
+
+                if ($record->getName() !== $subname) {
+                    continue;
+                }
+
+                if ($record->getData() !== $lookupData) {
+                    continue;
+                }
+
+                $recordId = $record->getId();
+                break;
+            }
+
             if ($recordId === null) {
-                throw new \Exception("Error: No record found with name '$subname' and type '$type'");
+                throw new \Exception("Error: No record found with name '$subname', type '$type' and value '$lookupData'");
             }
 
             $record = new Record();
-            
-            if (isset($recordId)) {
-                $record->setId($recordId);
-            } else {
-                throw new \Exception("Record ID is required for updating");
-            }
-            if (isset($type)) {
-                $record->setType($type);
-            }
-            if (isset($subname)) {
-                $record->setName($subname);
-            }
-            if (isset($rrsetData['records'])) {
+            $record->setId($recordId);
+            $record->setType($type);
+            $record->setName($subname);
+
+            if (!empty($rrsetData['records'][0])) {
                 $record->setData($rrsetData['records'][0]);
             }
-            $record->setPriority(0);
-            if (isset($rrsetData['ttl'])) {
-                $record->setTtl($rrsetData['ttl']);
+
+            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+                if (isset($rrsetData['priority'])) {
+                    $record->setPriority((int)$rrsetData['priority']);
+                }
             }
 
-            $response = $this->client->dns->updateRecord($domainName, $record);
+            if (isset($rrsetData['ttl'])) {
+                $record->setTtl((int)$rrsetData['ttl']);
+            }
+
+            $this->client->dns->updateRecord($domainName, $record);
+
             return json_decode($domainName, true);
         } catch (\Exception $e) {
             throw new \Exception("Error updating record: " . $e->getMessage());
