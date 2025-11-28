@@ -28,8 +28,12 @@ class DNSimple implements DnsHostingProviderInterface {
         }
 
         try {
-            $response = $this->client->domains->createDomain($this->account_id, ["name" => $domainName]);
-            return json_decode($response->getData()->name, true);
+            $response = $this->client->domains->createDomain(
+                $this->account_id,
+                ['name' => $domainName]
+            );
+
+            return $response->getData();
         } catch (\Exception $e) {
             throw new \Exception("Error creating domain: " . $e->getMessage());
         }
@@ -68,31 +72,39 @@ class DNSimple implements DnsHostingProviderInterface {
         try {
             $record = [];
 
-            if (isset($rrsetData['type'])) {
-                $record['type'] = $rrsetData['type'];
+            if (!empty($rrsetData['type'])) {
+                $record['type'] = strtoupper($rrsetData['type']);
             }
-            if (isset($rrsetData['subname'])) {
-                $record['name'] = $rrsetData['subname'];
-            }
-            if (isset($rrsetData['records'])) {
-                $record['content'] = $rrsetData['records'][0];
-            }
-            if (isset($rrsetData['priority'])) {
-                $record['priority'] = $rrsetData['priority'];
-            } else {
-                $record['priority'] = 0;
-            }
-            if (isset($rrsetData['ttl'])) {
-                $record['ttl'] = $rrsetData['ttl'];
-            }
-            
-            $response = $this->client->zones->createRecord($this->account_id, $domainName, $record);
-            $recordId = $response->getData()->id;
 
-            try {
-                saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
-            } catch (\Exception $e) {
-                echo "Error creating record: " . $e->getMessage() . "\n";
+            if (array_key_exists('subname', $rrsetData)) {
+                $subname = (string)$rrsetData['subname'];
+                $record['name'] = ($subname === '@') ? '' : $subname;
+            }
+
+            if (!empty($rrsetData['records'])) {
+                $record['content'] = (string)$rrsetData['records'][0];
+            }
+
+            if (isset($rrsetData['ttl'])) {
+                $record['ttl'] = (int)$rrsetData['ttl'];
+            }
+
+            if (
+                isset($record['type']) &&
+                in_array($record['type'], ['MX', 'SRV'], true) &&
+                isset($rrsetData['priority'])
+            ) {
+                $record['priority'] = (int)$rrsetData['priority'];
+            }
+
+            $response = $this->client->zones->createRecord($this->account_id, $domainName, $record);
+            $recordId = $response->getData()->id ?? null;
+
+            if ($recordId !== null) {
+                try {
+                    saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
+                } catch (\Exception $e) {
+                }
             }
 
             return true;
@@ -119,35 +131,38 @@ class DNSimple implements DnsHostingProviderInterface {
 
             $record = [];
 
-            if (isset($type)) {
-                $record['type'] = $type;
-            }
-            if (isset($subname)) {
-                $record['name'] = $subname;
-            }
-            if (isset($rrsetData['records'])) {
-                $record['content'] = $rrsetData['records'][0];
-            }
-            if (isset($rrsetData['priority'])) {
-                $record['priority'] = $rrsetData['priority'];
-            } else {
-                $record['priority'] = 0;
-            }
-            if (isset($rrsetData['ttl'])) {
-                $record['ttl'] = $rrsetData['ttl'];
+            if (!empty($type)) {
+                $record['type'] = strtoupper($type);
             }
 
-            $response = $this->client->zones->updateRecord($this->account_id, $domainName, $recordId, $record);
-            
-            if ($response->getStatusCode() === 200) {
-                return true;
-            } else {
-                return false;
+            if ($subname !== null) {
+                $name = (string)$subname;
+                $record['name'] = ($name === '@') ? '' : $name;
             }
-        } catch (\Exception $e) {
-            throw new \Exception("Error updating record: " . $e->getMessage());
+
+            if (!empty($rrsetData['records'])) {
+                $record['content'] = (string)$rrsetData['records'][0];
+            }
+
+            if (isset($rrsetData['ttl'])) {
+                $record['ttl'] = (int)$rrsetData['ttl'];
+            }
+
+            if (
+                !empty($type) &&
+                in_array(strtoupper($type), ['MX', 'SRV'], true) &&
+                isset($rrsetData['priority'])
+            ) {
+                $record['priority'] = (int)$rrsetData['priority'];
+            }
+
+            $this->client->zones->updateRecord($this->account_id, $domainName, $recordId, $record);
+
+            return true;
         } catch (\PDOException $e) {
             throw new \Exception("Error in operation: " . $e->getMessage());
+        } catch (\Exception $e) {
+            throw new \Exception("Error updating record: " . $e->getMessage());
         }
     }
 
@@ -158,14 +173,10 @@ class DNSimple implements DnsHostingProviderInterface {
     public function deleteRRset($domainName, $subname, $type, $value) {
         try {
             $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
-            
-            $response = $this->client->zones->deleteRecord($this->account_id, $domainName, $recordId);
-            
-            if ($response->getStatusCode() === 200) {
-                return true;
-            } else {
-                return false;
-            }
+
+            $this->client->zones->deleteRecord($this->account_id, $domainName, $recordId);
+
+            return true;
         } catch (\Exception $e) {
             throw new \Exception("Error deleting record: " . $e->getMessage());
         }

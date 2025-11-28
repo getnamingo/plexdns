@@ -31,23 +31,27 @@ class Hetzner implements DnsHostingProviderInterface {
         if (empty($domainName)) {
             throw new \Exception("Domain name cannot be empty");
         }
-            
+
         try {
             $response = $this->client->request('POST', 'zones', [
                 'headers' => $this->headers,
-                'json' => ['name' => $domainName]
+                'json'    => ['name' => $domainName],
             ]);
-            
-            $body = json_decode($response->getBody()->getContents(), true);
+
+            $body   = json_decode($response->getBody()->getContents(), true);
             $zoneId = $body['zone']['id'] ?? null;
-            
+
+            if ($zoneId === null) {
+                throw new \Exception("Hetzner API did not return a zone ID for {$domainName}");
+            }
+
             try {
                 saveZoneId($this->pdo, $domainName, $zoneId);
             } catch (\PDOException $e) {
                 throw new \Exception("Error saving zoneId: " . $e->getMessage());
             }
-            
-            return json_decode($response->getBody(), true);
+
+            return $body;
         } catch (\Exception $e) {
             throw new \Exception('Request failed: ' . $e->getMessage());
         }
@@ -101,6 +105,14 @@ class Hetzner implements DnsHostingProviderInterface {
             throw new \Exception("Domain name cannot be empty");
         }
 
+        if (
+            empty($rrsetData['type']) ||
+            !isset($rrsetData['subname'], $rrsetData['ttl'], $rrsetData['records']) ||
+            empty($rrsetData['records'])
+        ) {
+            throw new \Exception("Missing data for creating RRset");
+        }
+
         try {
             $result = getZoneId($this->pdo, $domainName);
             $zoneId = $result['zoneId'];
@@ -108,32 +120,47 @@ class Hetzner implements DnsHostingProviderInterface {
             throw new \Exception("Error fetching zoneId: " . $e->getMessage());
         }
 
+        $type    = strtoupper($rrsetData['type']);
+        $ttl     = (int)$rrsetData['ttl'];
+        $value   = (string)$rrsetData['records'][0];
+        $subname = $rrsetData['subname'];
+
+        $apiName = ($subname === '' || $subname === '@') ? '@' : $subname;
+
+        $payload = [
+            'value'   => $value,
+            'ttl'     => $ttl,
+            'type'    => $type,
+            'name'    => $apiName,
+            'zone_id' => $zoneId,
+        ];
+
+        if (in_array($type, ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
+            $payload['priority'] = (int)$rrsetData['priority'];
+        }
+
         try {
             $response = $this->client->request('POST', 'records', [
                 'headers' => $this->headers,
-                'json' => [
-                    'value' => $rrsetData['records'][0],
-                    'ttl' => $rrsetData['ttl'],
-                    'type' => $rrsetData['type'],
-                    'name' => $rrsetData['subname'],
-                    'zone_id' => $zoneId
-                ]
+                'json'    => $payload,
             ]);
 
             if ($response->getStatusCode() === 200) {
-                $body = json_decode($response->getBody()->getContents(), true);
+                $body     = json_decode($response->getBody()->getContents(), true);
                 $recordId = $body['record']['id'] ?? null;
 
-                saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
+                if ($recordId !== null) {
+                    saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
+                }
 
                 return true;
-            } else {
-                return false;
             }
-        } catch (GuzzleException $e) {
+
+            return false;
+        } catch (RequestException $e) {
             throw new \Exception('Request failed: ' . $e->getMessage());
         } catch (\PDOException $e) {
-            throw new \Exception("Error updating zoneId: " . $e->getMessage());
+            throw new \Exception("Error updating recordId: " . $e->getMessage());
         }
     }
 
@@ -153,29 +180,49 @@ class Hetzner implements DnsHostingProviderInterface {
         if (empty($domainName)) {
             throw new \Exception("Domain name cannot be empty");
         }
-            
-        try {
-            $result = getZoneId($this->pdo, $domainName);
-            $zoneId = $result['zoneId'];
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
 
+        if (
+            empty($type) ||
+            !isset($rrsetData['ttl'], $rrsetData['records']) ||
+            empty($rrsetData['records'])
+        ) {
+            throw new \Exception("Missing data for modifying RRset");
+        }
+
+        try {
+            $result  = getZoneId($this->pdo, $domainName);
+            $zoneId  = $result['zoneId'];
+            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
+        } catch (\PDOException $e) {
+            throw new \Exception("Error in operation: " . $e->getMessage());
+        }
+
+        $type  = strtoupper($type);
+        $ttl   = (int)$rrsetData['ttl'];
+        $value = (string)$rrsetData['records'][0];
+
+        $apiName = ($subname === '' || $subname === '@') ? '@' : $subname;
+
+        $payload = [
+            'value'   => $value,
+            'ttl'     => $ttl,
+            'type'    => $type,
+            'name'    => $apiName,
+            'zone_id' => $zoneId,
+        ];
+
+        if (in_array($type, ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
+            $payload['priority'] = (int)$rrsetData['priority'];
+        }
+
+        try {
             $response = $this->client->request('PUT', "records/{$recordId}", [
                 'headers' => $this->headers,
-                'json' => [
-                    'value' => $rrsetData['records'][0],
-                    'ttl' => $rrsetData['ttl'],
-                    'type' => $type,
-                    'name' => $subname,
-                    'zone_id' => $zoneId
-                ]
+                'json'    => $payload,
             ]);
 
-            if ($response->getStatusCode() === 200) {
-                return true;
-            } else {
-                return false;
-            }
-        } catch (GuzzleException $e) {
+            return $response->getStatusCode() === 200;
+        } catch (RequestException $e) {
             throw new \Exception('Request failed: ' . $e->getMessage());
         } catch (\PDOException $e) {
             throw new \Exception("Error in operation: " . $e->getMessage());
@@ -193,13 +240,9 @@ class Hetzner implements DnsHostingProviderInterface {
             $response = $this->client->request('DELETE', "records/{$recordId}", [
                 'headers' => $this->headers,
             ]);
-            
-            if ($response->getStatusCode() === 204) {
-                return true;
-            } else {
-                return false;
-            }
-        } catch (GuzzleException $e) {
+
+            return $response->getStatusCode() === 204;
+        } catch (RequestException $e) {
             throw new \Exception('Request failed: ' . $e->getMessage());
         } catch (\PDOException $e) {
             throw new \Exception("Error in operation: " . $e->getMessage());

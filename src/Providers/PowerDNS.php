@@ -113,7 +113,12 @@ class PowerDNS implements DnsHostingProviderInterface {
         }
 
         $nsRecords = array_filter($this->nsRecords);
-        $formattedNsRecords = array_values(array_map(fn($nsRecord) => rtrim($nsRecord, '.') . '.', $nsRecords));
+        $formattedNsRecords = array_values(
+            array_map(
+                static fn($nsRecord) => rtrim($nsRecord, '.') . '.',
+                $nsRecords
+            )
+        );
 
         try {
             $this->client->createZone($domainName, $formattedNsRecords);
@@ -129,13 +134,14 @@ class PowerDNS implements DnsHostingProviderInterface {
             }
 
             return true;
-        } catch (\\Exception $e) {
-            // Throw an \Exception to indicate failure, including for conflicts.
+        } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'Conflict') !== false) {
                 throw new \Exception("Zone already exists for domain: " . $domainName);
-            } else {
-                throw new \Exception("Failed to create zone for domain: " . $domainName . ". Error: " . $e->getMessage());
             }
+
+            throw new \Exception(
+                "Failed to create zone for domain: " . $domainName . ". Error: " . $e->getMessage()
+            );
         }
     }
 
@@ -168,18 +174,22 @@ class PowerDNS implements DnsHostingProviderInterface {
 
         return json_decode($domainName, true);
     }
-    
+
     public function createRRset($domainName, $rrsetData) {
         $zone = $this->client->zone($domainName);
-        
-        if (!isset($rrsetData['subname'], $rrsetData['type'], $rrsetData['ttl'], $rrsetData['records'])) {
+
+        if (
+            empty($domainName) ||
+            !isset($rrsetData['subname'], $rrsetData['type'], $rrsetData['ttl'], $rrsetData['records']) ||
+            empty($rrsetData['records'])
+        ) {
             throw new \Exception("Missing data for creating RRset");
         }
-        
+
         $subname = $rrsetData['subname'];
-        $type = $rrsetData['type'];
-        $ttl = $rrsetData['ttl'];
-        $recordValue = $rrsetData['records'][0];
+        $type    = strtoupper($rrsetData['type']);
+        $ttl     = (int)$rrsetData['ttl'];
+        $value   = (string)$rrsetData['records'][0];
 
         switch ($type) {
             case 'A':
@@ -207,7 +217,18 @@ class PowerDNS implements DnsHostingProviderInterface {
                 throw new \Exception("Invalid record type");
         }
 
-        $zone->create($subname, $recordType, $recordValue, $ttl);
+        if ($subname === '' || $subname === '@') {
+            $name = $domainName;
+        } else {
+            $name = $subname;
+        }
+
+        if ($type === 'MX' && isset($rrsetData['priority'])) {
+            $prio  = (int)$rrsetData['priority'];
+            $value = $prio . ' ' . $value;
+        }
+
+        $zone->create($name, $recordType, $value, $ttl);
 
         return json_decode($domainName, true);
     }
@@ -227,12 +248,17 @@ class PowerDNS implements DnsHostingProviderInterface {
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
         $zone = $this->client->zone($domainName);
 
-        if (!isset($subname, $type, $rrsetData['ttl'], $rrsetData['records'])) {
-            throw new \Exception("Missing data for creating RRset");
+        if (
+            empty($domainName) ||
+            !isset($subname, $type, $rrsetData['ttl'], $rrsetData['records']) ||
+            empty($rrsetData['records'])
+        ) {
+            throw new \Exception("Missing data for modifying RRset");
         }
-        
-        $ttl = $rrsetData['ttl'];
-        $recordValue = $rrsetData['records'][0];
+
+        $type  = strtoupper($type);
+        $ttl   = (int)$rrsetData['ttl'];
+        $value = (string)$rrsetData['records'][0];
 
         switch ($type) {
             case 'A':
@@ -260,8 +286,24 @@ class PowerDNS implements DnsHostingProviderInterface {
                 throw new \Exception("Invalid record type");
         }
 
-        $zone->create($subname, $recordType, $recordValue, $ttl);
-        
+        if ($subname === '' || $subname === '@') {
+            $name = $domainName;
+        } else {
+            $name = $subname;
+        }
+
+        if ($type === 'MX' && isset($rrsetData['priority'])) {
+            $prio  = (int)$rrsetData['priority'];
+            $value = $prio . ' ' . $value;
+        }
+
+        $existing = $zone->find($name, $recordType);
+        if ($existing instanceof ResourceRecord) {
+            $existing->delete();
+        }
+
+        $zone->create($name, $recordType, $value, $ttl);
+
         return json_decode($domainName, true);
     }
 
@@ -271,11 +313,13 @@ class PowerDNS implements DnsHostingProviderInterface {
 
     public function deleteRRset($domainName, $subname, $type, $value) {
         $zone = $this->client->zone($domainName);
-        
-        if (!isset($subname, $type, $value)) {
-            throw new \Exception("Missing data for creating RRset");
+
+        if (empty($domainName) || !isset($subname, $type)) {
+            throw new \Exception("Missing data for deleting RRset");
         }
-        
+
+        $type = strtoupper($type);
+
         switch ($type) {
             case 'A':
                 $recordType = RecordType::A;
@@ -302,8 +346,17 @@ class PowerDNS implements DnsHostingProviderInterface {
                 throw new \Exception("Invalid record type");
         }
 
-        $zone->find($subname, $recordType)->delete();
-        
+        if ($subname === '' || $subname === '@') {
+            $name = $domainName;
+        } else {
+            $name = $subname;
+        }
+
+        $existing = $zone->find($name, $recordType);
+        if ($existing instanceof ResourceRecord) {
+            $existing->delete();
+        }
+
         return json_decode($domainName, true);
     }
 
