@@ -279,7 +279,7 @@ class Service
 
         $useModify = false;
 
-        if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['TXT', 'MX'], true)) {
+        if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['A', 'TXT', 'MX'], true)) {
             // Fetch existing records for same host + type
             $existing = $this->fetchData(
                 "SELECT value, priority FROM records
@@ -394,8 +394,8 @@ class Service
         $type = $data['record_type'];
         $host = $data['record_name'];
 
-        // deSEC handling (TXT/MX)
-        if ($data['provider'] === 'Desec' && in_array($type, ['TXT', 'MX'], true)) {
+        // deSEC handling
+        if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT recordId, value, priority
@@ -449,6 +449,9 @@ class Service
                 'ttl'     => (int)$data['record_ttl'],
                 'records' => [$data['record_value']],
             ];
+            if (!empty($data['old_value'])) {
+                $rrsetData['old_value'] = $data['old_value'];
+            }
 
             if ($type === 'MX') {
                 if ($data['provider'] === 'Desec') {
@@ -539,8 +542,8 @@ class Service
             throw new \RuntimeException("DNS provider is not set.");
         }
 
-        // deSEC multi-value delete (TXT/MX)
-        if ($data['provider'] === 'Desec' && in_array($type, ['TXT', 'MX'], true)) {
+        // deSEC multi-value delete
+        if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT recordId, value, priority

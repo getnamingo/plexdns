@@ -128,14 +128,29 @@ class ClouDNS implements DnsHostingProviderInterface {
             throw new Exception("Missing data for modifying RRset");
         }
 
+        $targetRecord = is_array($rrsetData['records'])
+            ? (string) reset($rrsetData['records'])
+            : (string) $rrsetData['records'];
+
+        if (isset($rrsetData['old_value']) && $rrsetData['old_value'] !== '') {
+            $lookupRecord = (string)$rrsetData['old_value'];   // use OLD value for matching
+        } else {
+            $lookupRecord = $targetRecord;  // fallback to new value
+        }
+
         // Fetch all records for the domain
         $records = $this->request('records.json', [
-            'domain-name' => $domainName
+            'domain-name' => $domainName,
         ]);
 
         $recordId = null;
         foreach ($records as $record) {
-            if ($record['host'] === $subname && $record['type'] === $type) {
+            if (
+                isset($record['type'], $record['host'], $record['record']) &&
+                $record['type'] === $type &&
+                $record['host'] === $subname &&
+                $record['record'] === $lookupRecord
+            ) {
                 $recordId = $record['id'];
                 break;
             }
@@ -150,7 +165,7 @@ class ClouDNS implements DnsHostingProviderInterface {
             'record-id'   => $recordId,
             'record-type' => $type,
             'host'        => $subname,
-            'record'      => implode("\n", $rrsetData['records']),
+            'record'      => $targetRecord,
             'ttl'         => (int)$rrsetData['ttl'],
         ];
 
