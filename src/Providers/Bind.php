@@ -15,7 +15,6 @@
 namespace PlexDNS\Providers;
 
 use Namingo\Bind9Api\ApiClient;
-use Spatie\Dns\Dns;
 
 class Bind implements DnsHostingProviderInterface {
     private $client;
@@ -178,51 +177,40 @@ class Bind implements DnsHostingProviderInterface {
             throw new \Exception("Domain name cannot be empty");
         }
 
-        if (!isset($subname, $type, $rrsetData['ttl'], $rrsetData['records'])) {
+        if ($subname === null || $subname === '') {
+            $subname = '@';
+        }
+
+        if (
+            empty($type) ||
+            !isset($rrsetData['ttl'], $rrsetData['records']) ||
+            empty($rrsetData['records'])
+        ) {
             throw new \Exception("Missing data for creating RRset");
         }
 
+        // old value from hidden field
+        $oldValue = $rrsetData['old_value'] ?? null;
+        if ($oldValue === null || $oldValue === '') {
+            throw new \Exception("Missing old_value for RRset update");
+        }
+
         $recordValue = $rrsetData['records'][0];
-        $fqdn = ($subname === '@') ? ltrim($domainName, '.') : "$subname.$domainName"; 
-
-        $dns = new Dns();
-        $dns->useNameserver($this->api_ip);
-        $record = $dns->getRecords($fqdn, strtoupper($type))[0];
-        
-        // Check if the desired record type was found
-        if (empty($record)) {
-            throw new \Exception("Failed to retrieve current $type record for $fqdn");
-        }
-
-        $recordString = (string)$record;
-        $recordParts = preg_split('/\s+/', trim($recordString));
-
-        // Handle MX record differently by checking if the type is 'MX'
-        $recordType = strtoupper($recordParts[3]); // The 4th element is the type (e.g., 'A', 'MX', 'TXT')
-        if ($recordType === 'MX') {
-            // For MX, the second last element is the actual value
-            $currentRecordValue = $recordParts[4] . ' ' . end($recordParts);
-        } else {
-            // For other types, take the last element
-            $currentRecordValue = end($recordParts);
-        }
-
-        if ($currentRecordValue === null) {
-            throw new \Exception("Failed to retrieve current $type record for $fqdn");
-        }
 
         // Prepare the current record for the update
         $currentRecord = [
-            'name' => $subname,
-            'type' => $type,
-            'rdata' => $currentRecordValue,
+            'name'  => $subname,
+            'type'  => $type,
+            'rdata' => $oldValue,
         ];
+
         $newRecord = [
-            'rdata' => $recordValue
+            'rdata' => $recordValue,
+            'ttl'   => $rrsetData['ttl'],
         ];
 
         $this->client->updateRecord($domainName, $currentRecord, $newRecord);
-        
+
         return json_decode($domainName, true);
     }
 
@@ -235,18 +223,22 @@ class Bind implements DnsHostingProviderInterface {
             throw new \Exception("Domain name cannot be empty");
         }
 
-        if (!isset($subname, $type, $value)) {
-            throw new \Exception("Missing data for creating RRset");
+        if ($subname === null || $subname === '') {
+            $subname = '@';
         }
-        
+
+        if (empty($type) || $value === null || $value === '') {
+            throw new \Exception("Missing data for deleting RRset");
+        }
+
         $record = [
-            'name' => $subname,
-            'type' => $type,
-            'rdata' => $value
+            'name'  => $subname,
+            'type'  => strtoupper($type),
+            'rdata' => $value,
         ];
 
         $this->client->deleteRecord($domainName, $record);
-        
+
         return json_decode($domainName, true);
     }
 

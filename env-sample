@@ -9,8 +9,8 @@ SQLITE_PATH=database.sqlite  # Relative path for SQLite
 DNS_ANYCASTDNS_API_KEY=
 
 # Bind9
-DNS_BIND9_API_KEY=
-DNS_BIND9_BIND_IP=
+DNS_BIND_API_KEY=
+DNS_BIND_BIND_IP=
 
 # Cloudflare
 DNS_CLOUDFLARE_EMAIL=
