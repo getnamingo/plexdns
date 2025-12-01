@@ -155,7 +155,7 @@ class Bind implements DnsHostingProviderInterface {
             $this->client->addRecord($domainName, $record);
             return true;
         } catch (\Exception $e) {
-           throw new \Exception("Failed to create zone for domain: " . $domainName . ". Error: " . $e->getMessage());
+           throw new \Exception("Error creating record: " . $e->getMessage());
         }
 
         return json_decode($domainName, true);
