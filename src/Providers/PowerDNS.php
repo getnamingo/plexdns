@@ -175,62 +175,104 @@ class PowerDNS implements DnsHostingProviderInterface {
         return json_decode($domainName, true);
     }
 
-    public function createRRset($domainName, $rrsetData) {
-        $zone = $this->client->zone($domainName);
+    public function createRRset($domainName, $rrsetData)
+    {
+        if (empty($domainName)) {
+            throw new \Exception("Domain name cannot be empty");
+        }
 
         if (
-            empty($domainName) ||
             !isset($rrsetData['subname'], $rrsetData['type'], $rrsetData['ttl'], $rrsetData['records']) ||
-            empty($rrsetData['records'])
+            !is_array($rrsetData['records']) ||
+            count($rrsetData['records']) === 0
         ) {
             throw new \Exception("Missing data for creating RRset");
         }
 
+        $zone    = $this->client->zone($domainName);
         $subname = $rrsetData['subname'];
         $type    = strtoupper($rrsetData['type']);
         $ttl     = (int)$rrsetData['ttl'];
-        $value   = (string)$rrsetData['records'][0];
 
-        switch ($type) {
-            case 'A':
-                $recordType = RecordType::A;
-                break;
-            case 'AAAA':
-                $recordType = RecordType::AAAA;
-                break;
-            case 'CNAME':
-                $recordType = RecordType::CNAME;
-                break;
-            case 'MX':
-                $recordType = RecordType::MX;
-                break;
-            case 'TXT':
-                $recordType = RecordType::TXT;
-                break;
-            case 'SPF':
-                $recordType = RecordType::SPF;
-                break;
-            case 'DS':
-                $recordType = RecordType::DS;
-                break;
-            default:
-                throw new \Exception("Invalid record type");
+        if (!defined(RecordType::class . '::' . $type)) {
+            throw new \Exception("Invalid record type");
         }
+        $recordType = constant(RecordType::class . '::' . $type);
 
-        if ($subname === '' || $subname === '@') {
-            $name = $domainName;
+        $name = ($subname === '' || $subname === '@') ? '@' : $subname;
+
+        $zoneRootNoDot  = rtrim($domainName, '.');
+        $zoneRootWithDot = $zoneRootNoDot . '.';
+
+        if ($name === '@') {
+            $candidateNames = ['@', $zoneRootNoDot, $zoneRootWithDot];
         } else {
-            $name = $subname;
+            $ownerShort       = $name;
+            $ownerFqdnNoDot   = $ownerShort . '.' . $zoneRootNoDot;
+            $ownerFqdnWithDot = $ownerFqdnNoDot . '.';
+
+            $candidateNames = [$ownerShort, $ownerFqdnNoDot, $ownerFqdnWithDot];
         }
 
-        if ($type === 'MX' && isset($rrsetData['priority'])) {
-            $prio  = (int)$rrsetData['priority'];
-            $value = $prio . ' ' . $value;
+        $all            = $zone->get();
+        $existingSet    = null;
+        $existingTtl    = $ttl;
+        $existingValues = [];
+
+        foreach ($all as $rrset) {
+            if (in_array($rrset->getName(), $candidateNames, true) && $rrset->getType() === $recordType) {
+                $existingSet = $rrset;
+
+                if ($rrset->getTtl() !== null) {
+                    $existingTtl = $rrset->getTtl();
+                }
+
+                foreach ($rrset->getRecords() as $rec) {
+                    $existingValues[] = $rec->getContent();
+                }
+
+                break;
+            }
         }
 
-        $zone->create($name, $recordType, $value, $ttl);
+        $mergedValues = $existingValues;
 
-        return json_decode($domainName, true);
+        foreach ($rrsetData['records'] as $val) {
+            $value = (string)$val;
+
+            if ($type === 'MX' && isset($rrsetData['priority'])) {
+                $prio = (int)$rrsetData['priority'];
+                $host = rtrim($value, '.');
+                $value = $prio . ' ' . $host . '.';
+            }
+
+            if (!in_array($value, $mergedValues, true)) {
+                $mergedValues[] = $value;
+            }
+        }
+
+        if (empty($mergedValues)) {
+            return true;
+        }
+
+        if ($existingSet instanceof ResourceRecord) {
+            $existingSet->delete();
+        }
+
+        $rrset = new ResourceRecord();
+        $rrset->setName($name);
+        $rrset->setType($recordType);
+        $rrset->setTtl($existingTtl);
+
+        foreach ($mergedValues as $val) {
+            $record = new Record();
+            $record->setContent($val);
+            $rrset->addRecord($record);
+        }
+
+        $zone->create($rrset);
+
+        return true;
     }
 
     public function createBulkRRsets($domainName, $rrsetDataArray) {
@@ -245,119 +287,230 @@ class PowerDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function modifyRRset($domainName, $subname, $type, $rrsetData) {
-        $zone = $this->client->zone($domainName);
+    public function modifyRRset($domainName, $subname, $type, $rrsetData)
+    {
+        if (empty($domainName)) {
+            throw new \Exception("Domain name cannot be empty");
+        }
 
         if (
-            empty($domainName) ||
-            !isset($subname, $type, $rrsetData['ttl'], $rrsetData['records']) ||
-            empty($rrsetData['records'])
+            !isset($rrsetData['ttl'], $rrsetData['records']) ||
+            !is_array($rrsetData['records']) ||
+            count($rrsetData['records']) === 0
         ) {
             throw new \Exception("Missing data for modifying RRset");
         }
 
-        $type  = strtoupper($type);
-        $ttl   = (int)$rrsetData['ttl'];
-        $value = (string)$rrsetData['records'][0];
+        $zone = $this->client->zone($domainName);
 
-        switch ($type) {
-            case 'A':
-                $recordType = RecordType::A;
-                break;
-            case 'AAAA':
-                $recordType = RecordType::AAAA;
-                break;
-            case 'CNAME':
-                $recordType = RecordType::CNAME;
-                break;
-            case 'MX':
-                $recordType = RecordType::MX;
-                break;
-            case 'TXT':
-                $recordType = RecordType::TXT;
-                break;
-            case 'SPF':
-                $recordType = RecordType::SPF;
-                break;
-            case 'DS':
-                $recordType = RecordType::DS;
-                break;
-            default:
-                throw new \Exception("Invalid record type");
+        $type = strtoupper($type);
+        if (!defined(RecordType::class . '::' . $type)) {
+            throw new \Exception("Invalid record type");
         }
+        $recordType = constant(RecordType::class . '::' . $type);
 
-        if ($subname === '' || $subname === '@') {
-            $name = $domainName;
+        $name = ($subname === '' || $subname === '@') ? '@' : $subname;
+
+        $zoneRootNoDot   = rtrim($domainName, '.');
+        $zoneRootWithDot = $zoneRootNoDot . '.';
+
+        if ($name === '@') {
+            $candidateNames = ['@', $zoneRootNoDot, $zoneRootWithDot];
         } else {
-            $name = $subname;
+            $ownerShort       = $name;
+            $ownerFqdnNoDot   = $ownerShort . '.' . $zoneRootNoDot;
+            $ownerFqdnWithDot = $ownerFqdnNoDot . '.';
+
+            $candidateNames = [$ownerShort, $ownerFqdnNoDot, $ownerFqdnWithDot];
         }
+
+        $all            = $zone->get();
+        $existingSet    = null;
+        $existingTtl    = (int)$rrsetData['ttl'];
+        $existingValues = [];
+
+        foreach ($all as $rrset) {
+            if (in_array($rrset->getName(), $candidateNames, true) && $rrset->getType() === $recordType) {
+                $existingSet = $rrset;
+
+                if ($rrset->getTtl() !== null) {
+                    $existingTtl = $rrset->getTtl();
+                }
+
+                foreach ($rrset->getRecords() as $rec) {
+                    $existingValues[] = $rec->getContent();
+                }
+
+                break;
+            }
+        }
+
+        $old = rtrim($rrsetData['old_value'] ?? '', '.');
+        $new = rtrim($rrsetData['records'][0], '.');
 
         if ($type === 'MX' && isset($rrsetData['priority'])) {
-            $prio  = (int)$rrsetData['priority'];
-            $value = $prio . ' ' . $value;
+            $prio = (int)$rrsetData['priority'];
+            $new  = $prio . ' ' . $new . '.';
         }
 
-        $existing = $zone->find($name, $recordType);
-        if ($existing instanceof ResourceRecord) {
-            $existing->delete();
+        $mergedValues = [];
+
+        foreach ($existingValues as $content) {
+
+            if ($recordType === RecordType::MX) {
+                $parts      = preg_split('/\s+/', trim($content), 2);
+                $prioOldRec = $parts[0] ?? '';
+                $hostOldRec = rtrim($parts[1] ?? '', '.');
+
+                $normContent = $hostOldRec;
+                $normOld     = rtrim($old, '.');
+            } else {
+                $normContent = rtrim($content, '.');
+                $normOld     = rtrim($old, '.');
+            }
+
+            if ($normContent === $normOld) {
+                $mergedValues[] = $new;
+            } else {
+                $mergedValues[] = $content;
+            }
         }
 
-        $zone->create($name, $recordType, $value, $ttl);
+        if (!in_array($new, $mergedValues, true)) {
+            $mergedValues[] = $new;
+        }
 
-        return json_decode($domainName, true);
+        if (empty($mergedValues)) {
+            return true;
+        }
+
+        if ($existingSet instanceof ResourceRecord) {
+            $existingSet->delete();
+        }
+
+        $rrset = new ResourceRecord();
+        $rrset->setName($name);
+        $rrset->setType($recordType);
+        $rrset->setTtl($existingTtl);
+
+        foreach ($mergedValues as $val) {
+            $record = new Record();
+            $record->setContent($val);
+            $rrset->addRecord($record);
+        }
+
+        $zone->create($rrset);
+
+        return true;
     }
 
     public function modifyBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
-        $zone = $this->client->zone($domainName);
+    public function deleteRRset($domainName, $subname, $type, $value)
+    {
+        if (empty($domainName)) {
+            throw new \Exception("Domain name cannot be empty");
+        }
 
-        if (empty($domainName) || !isset($subname, $type)) {
+        if (!isset($subname, $type) || $value === null || $value === '') {
             throw new \Exception("Missing data for deleting RRset");
         }
 
+        $zone = $this->client->zone($domainName);
+
         $type = strtoupper($type);
-
-        switch ($type) {
-            case 'A':
-                $recordType = RecordType::A;
-                break;
-            case 'AAAA':
-                $recordType = RecordType::AAAA;
-                break;
-            case 'CNAME':
-                $recordType = RecordType::CNAME;
-                break;
-            case 'MX':
-                $recordType = RecordType::MX;
-                break;
-            case 'TXT':
-                $recordType = RecordType::TXT;
-                break;
-            case 'SPF':
-                $recordType = RecordType::SPF;
-                break;
-            case 'DS':
-                $recordType = RecordType::DS;
-                break;
-            default:
-                throw new \Exception("Invalid record type");
+        if (!defined(RecordType::class . '::' . $type)) {
+            throw new \Exception("Invalid record type");
         }
+        $recordType = constant(RecordType::class . '::' . $type);
 
-        if ($subname === '' || $subname === '@') {
-            $name = $domainName;
+        $name = ($subname === '' || $subname === '@') ? '@' : $subname;
+        $value = (string)$value;
+
+        $zoneRootNoDot   = rtrim($domainName, '.');
+        $zoneRootWithDot = $zoneRootNoDot . '.';
+
+        if ($name === '@') {
+            $candidateNames = ['@', $zoneRootNoDot, $zoneRootWithDot];
         } else {
-            $name = $subname;
+            $ownerShort       = $name;
+            $ownerFqdnNoDot   = $ownerShort . '.' . $zoneRootNoDot;
+            $ownerFqdnWithDot = $ownerFqdnNoDot . '.';
+
+            $candidateNames = [$ownerShort, $ownerFqdnNoDot, $ownerFqdnWithDot];
         }
 
-        $existing = $zone->find($name, $recordType);
-        if ($existing instanceof ResourceRecord) {
-            $existing->delete();
+        $all           = $zone->get();
+        $existingSet   = null;
+        $existingTtl   = null;
+        $existingValues = [];
+
+        foreach ($all as $rrset) {
+            if (in_array($rrset->getName(), $candidateNames, true) && $rrset->getType() === $recordType) {
+                $existingSet = $rrset;
+
+                if ($rrset->getTtl() !== null) {
+                    $existingTtl = $rrset->getTtl();
+                }
+
+                foreach ($rrset->getRecords() as $rec) {
+                    $existingValues[] = $rec->getContent();
+                }
+
+                break;
+            }
         }
 
-        return json_decode($domainName, true);
+        if (!$existingSet instanceof ResourceRecord || empty($existingValues)) {
+            return true;
+        }
+
+        $remaining = [];
+        $normValue = rtrim($value, '.');
+
+        foreach ($existingValues as $content) {
+            if ($recordType === RecordType::MX) {
+                $parts  = preg_split('/\s+/', $content, 2);
+                $target = $parts[1] ?? $content;
+
+                $normContent = rtrim($content, '.');
+                $normTarget  = rtrim($target, '.');
+
+                if ($normContent === $normValue || $normTarget === $normValue) {
+                    continue;
+                }
+            } else {
+                if (rtrim($content, '.') === $normValue) {
+                    continue;
+                }
+            }
+
+            $remaining[] = $content;
+        }
+
+        $existingSet->delete();
+
+        if (!empty($remaining)) {
+            $rrset = new ResourceRecord();
+            $rrset->setName($name);
+            $rrset->setType($recordType);
+
+            if ($existingTtl !== null) {
+                $rrset->setTtl($existingTtl);
+            }
+
+            foreach ($remaining as $content) {
+                $record = new Record();
+                $record->setContent($content);
+                $rrset->addRecord($record);
+            }
+
+            $zone->create($rrset);
+        }
+
+        return true;
     }
 
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
