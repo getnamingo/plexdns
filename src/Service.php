@@ -47,10 +47,10 @@ class Service
                 $this->dnsProvider = new Providers\Desec($config);
                 break;
             case 'DNSimple':
-                $this->dnsProvider = new Providers\DNSimple($config);
+                $this->dnsProvider = new Providers\DNSimple($config, $this->db);
                 break;
             case 'Hetzner':
-                $this->dnsProvider = new Providers\Hetzner($config);
+                $this->dnsProvider = new Providers\Hetzner($config, $this->db);
                 break;
             case 'PowerDNS':
                 $this->dnsProvider = new Providers\PowerDNS($config);
@@ -317,16 +317,18 @@ class Service
         }
 
         // Step 4: Create record in DNS provider
+        $providerRecordId = null;
+
         try {
             if ($useModify) {
-                $this->dnsProvider->modifyRRset(
+                $providerRecordId = $this->dnsProvider->modifyRRset(
                     $domainName,
                     $data['record_name'],
                     $data['record_type'],
                     $rrsetData
                 );
             } else {
-                $this->dnsProvider->createRRset($domainName, $rrsetData);
+                $providerRecordId = $this->dnsProvider->createRRset($domainName, $rrsetData);
             }
         } catch (\Throwable $e) {
             throw new \RuntimeException("Failed to add DNS record: " . $e->getMessage());
@@ -346,7 +348,9 @@ class Service
             ':priority' => isset($data['record_priority']) ? (int) $data['record_priority'] : 0,
             ':created_at' => date('Y-m-d H:i:s'),
             ':updated_at' => date('Y-m-d H:i:s'),
-            ':record_id' => uniqid(),
+            ':record_id' => (!is_bool($providerRecordId) && $providerRecordId !== null)
+                ? (string)$providerRecordId
+                : uniqid(),
         ];
 
         try {

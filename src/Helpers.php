@@ -94,10 +94,11 @@ function saveRecordId(PDO $pdo, string $domainName, string $recordId, array $rrs
  * @param string $domainName The domain name associated with the record.
  * @param string $type The type of the DNS record (e.g., A, MX, CNAME).
  * @param string $subname The subdomain or hostname of the record.
+ * @param array|string $valueOrRrsetData Pass full RRset array or string to match by value/priority.
  * @return string The recordId of the DNS record.
  * @throws Exception If the domain or record does not exist.
  */
-function getRecordId(PDO $pdo, string $domainName, string $type, string $subname): string
+function getRecordId(PDO $pdo, string $domainName, string $type, string $subname, array|string $valueOrRrsetData): string
 {
     // Step 1: Fetch the domain ID
     $sqlDomain = "SELECT id FROM zones WHERE domain_name = :domainName LIMIT 1";
@@ -111,19 +112,24 @@ function getRecordId(PDO $pdo, string $domainName, string $type, string $subname
     }
 
     $domainId = $domain['id'];
+    if (is_array($valueOrRrsetData)) {
+        $recordValue = $valueOrRrsetData['old_value'] ?? null;
+    } else {
+        $recordValue = $valueOrRrsetData;
+    }
 
     // Step 2: Fetch the record ID
     $sqlRecord = "
         SELECT recordId 
         FROM records 
-        WHERE type = :type AND host = :subname AND domain_id = :domain_id 
-        LIMIT 1
+        WHERE type = :type AND host = :subname AND domain_id = :domain_id and value = :value
     ";
     $stmtRecord = $pdo->prepare($sqlRecord);
     $stmtRecord->execute([
         ':type' => $type,
         ':subname' => $subname,
         ':domain_id' => $domainId,
+        ':value' => $recordValue,
     ]);
 
     $record = $stmtRecord->fetch(PDO::FETCH_ASSOC);

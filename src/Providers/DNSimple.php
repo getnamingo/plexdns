@@ -19,7 +19,17 @@ class DNSimple implements DnsHostingProviderInterface {
         }
 
         $this->client = new Client($token);
-        $this->account_id = $this->client->identity->whoami()->getData()->account->id;
+
+        $whoami = $this->client->identity->whoami();
+        $data   = $whoami->getData();
+
+        if (!isset($data->account) || !isset($data->account->id)) {
+            throw new \Exception(
+                'DNSimple: unable to determine account_id from whoami(): ' . json_encode($data)
+            );
+        }
+
+        $this->account_id = $data->account->id;
     }
 
     public function createDomain($domainName) {
@@ -100,14 +110,7 @@ class DNSimple implements DnsHostingProviderInterface {
             $response = $this->client->zones->createRecord($this->account_id, $domainName, $record);
             $recordId = $response->getData()->id ?? null;
 
-            if ($recordId !== null) {
-                try {
-                    saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
-                } catch (\Exception $e) {
-                }
-            }
-
-            return true;
+            return $recordId;
         } catch (\Exception $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }
@@ -127,7 +130,7 @@ class DNSimple implements DnsHostingProviderInterface {
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
+            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
 
             $record = [];
 
@@ -172,7 +175,7 @@ class DNSimple implements DnsHostingProviderInterface {
 
     public function deleteRRset($domainName, $subname, $type, $value) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
+            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
 
             $this->client->zones->deleteRecord($this->account_id, $domainName, $recordId);
 
