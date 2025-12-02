@@ -34,17 +34,17 @@ cp vendor/namingo/plexdns/demo.php .
 
 Most DNS providers **require an API key**, while some may need **additional settings** such as authentication credentials or specific server configurations. All required values must be set in the `.env` file.
 
-| Provider    | Credentials in .env | Requirements  | Status |
-|------------|---------------------|------------|---------------------|
-| **AnycastDNS** | `API_KEY` | | ✅ |
-| **Bind9** | `API_KEY:BIND_IP` | [bind9-api-server](https://github.com/getnamingo/bind9-api-server) or [bind9-api-server-sqlite](https://github.com/getnamingo/bind9-api-server-sqlite) | ✅ |
-| **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ |
-| **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ |
-| **Desec** | `API_KEY` | | ✅ |
-| **DNSimple** | `API_KEY` | | ✅ |
-| **Hetzner** | `API_KEY` | | 🚧 |
-| **PowerDNS** | `API_KEY:POWERDNS_IP` | | ✅ |
-| **Vultr** | `API_KEY` | | ✅ |
+| Provider    | Credentials in .env | Requirements  | Status | DNSSEC |
+|------------|---------------------|------------|---------------------|---------------------|
+| **AnycastDNS** | `API_KEY` | | ✅ | ❌ |
+| **Bind9** | `API_KEY:BIND_IP` | [bind9-api-server](https://github.com/getnamingo/bind9-api-server)/[bind9-api-server-sqlite](https://github.com/getnamingo/bind9-api-server-sqlite) | ✅ | 🚧 |
+| **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ | ❌ |
+| **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ | 🚧 |
+| **Desec** | `API_KEY` | | ✅ | 🚧 |
+| **DNSimple** | `API_KEY` | | ✅ | ❌ |
+| **Hetzner** | `API_KEY` | | 🚧 | ❌ |
+| **PowerDNS** | `API_KEY:POWERDNS_IP` | | ✅ | 🚧 |
+| **Vultr** | `API_KEY` | | ✅ | ❌ |
 
 ### Slave Zone Support
 
