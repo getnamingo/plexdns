@@ -14,15 +14,11 @@ composer require namingo/plexdns
 2. Copy the sample configuration files from `vendor/namingo/plexdns` to your project root:
 
 ```sh
-cp vendor/namingo/plexdns/env-sample .env
+cp vendor/namingo/plexdns/env-sample .
 cp vendor/namingo/plexdns/demo.php .
 ```
 
-3. Rename `env-sample` to `.env`:
-
-```sh
-mv .env-sample .env
-```
+3. Move contents of `env-sample` to your project `.env` file.
 
 4. Edit `.env` to configure your API credentials and database settings.
 
@@ -85,19 +81,13 @@ $config = [
 ];
 ```
 
----
-
 ## Acknowledgements
 
 We extend our gratitude to:
 - [QCloudns API Client](https://github.com/sussdorf/qcloudns) which served as inspiration for our ClouDNS module.
 
----
-
 ## 📄 License
 PlexDNS is licensed under the **MIT License**.
-
----
 
 ## 📩 Contributing
 We welcome contributions! Feel free to submit **issues** or **pull requests** to improve the project.
@@ -106,8 +96,6 @@ We welcome contributions! Feel free to submit **issues** or **pull requests** to
 2. Create a new branch.
 3. Make your changes and commit them.
 4. Submit a pull request.
-
----
 
 ## 📞 Support
 For any issues, please open an issue on GitHub or contact us at **help@namingo.org**.
