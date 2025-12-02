@@ -110,7 +110,13 @@ class AnycastDNS implements DnsHostingProviderInterface {
             $params['prio'] = (int) $rrsetData['priority'];
         }
 
-        return $this->request('POST', "dns/{$domainName}/record", $params);
+        $result = $this->request('POST', "dns/{$domainName}/record", $params);
+
+        if (is_array($result) && isset($result['record_id'])) {
+            return (string)$result['record_id'];
+        }
+
+        return true;
     }
 
     public function createBulkRRsets($domainName, $rrsetDataArray) {

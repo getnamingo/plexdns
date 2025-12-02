@@ -108,7 +108,11 @@ class ClouDNS implements DnsHostingProviderInterface {
 
         $response = $this->request('add-record.json', $params);
 
-        return json_decode($domainName, true);
+        if (is_array($response) && isset($response['data']['id'])) {
+            return (string)$response['data']['id'];
+        }
+
+        return true;
     }
     
     public function createBulkRRsets($domainName, $rrsetDataArray) {

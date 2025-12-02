@@ -97,7 +97,7 @@ class Cloudflare implements DnsHostingProviderInterface {
                 ? $domainName
                 : $sub . '.' . $domainName;
 
-            return $this->dns->addRecord(
+            $result = $this->dns->addRecord(
                 $zoneId,
                 $rrsetData['type'],
                 $name,
@@ -106,6 +106,8 @@ class Cloudflare implements DnsHostingProviderInterface {
                 false,
                 $priority
             );
+
+            return $result === true;
         } catch (\Cloudflare\API\Endpoints\EndpointException $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }

@@ -86,7 +86,8 @@ class Vultr implements DnsHostingProviderInterface {
             }
 
             $response = $this->client->dns->createRecord($domainName, $record);
-            return json_decode($domainName, true);
+
+            return true;
         } catch (\Exception $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }
