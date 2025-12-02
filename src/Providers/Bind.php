@@ -73,7 +73,6 @@ class Bind implements DnsHostingProviderInterface {
 
             return true;
         } catch (\Exception $e) {
-            // Throw an exception to indicate failure, including for conflicts.
             if (strpos($e->getMessage(), 'Conflict') !== false) {
                 throw new \Exception("Zone already exists for domain: " . $domainName);
             } else {
@@ -134,11 +133,13 @@ class Bind implements DnsHostingProviderInterface {
             throw new \Exception("Missing data for creating RRset");
         }
 
-        if (strtoupper($rrsetData['type']) === 'MX') {
+        $type = strtoupper($rrsetData['type']);
+        if ($type === 'MX') {
             $priority = (int)($rrsetData['priority'] ?? 10);
             $exchange = rtrim($rrsetData['records'][0], '.');
- 
             $rdata = "$priority $exchange";
+        } elseif (in_array($type, ['TXT', 'SPF'], true)) {
+            $rdata = $this->stripOuterQuotes($rrsetData['records'][0]);
         } else {
             $rdata = $rrsetData['records'][0];
         }
@@ -189,15 +190,19 @@ class Bind implements DnsHostingProviderInterface {
             throw new \Exception("Missing data for creating RRset");
         }
 
-        // old value from hidden field
+        $typeUpper = strtoupper($type);
         $oldValue = $rrsetData['old_value'] ?? null;
         if ($oldValue === null || $oldValue === '') {
             throw new \Exception("Missing old_value for RRset update");
         }
 
-        $recordValue = $rrsetData['records'][0];
+        if (in_array($typeUpper, ['TXT', 'SPF'], true)) {
+            $oldValue    = $this->stripOuterQuotes($oldValue);
+            $recordValue = $this->stripOuterQuotes($rrsetData['records'][0]);
+        } else {
+            $recordValue = $rrsetData['records'][0];
+        }
 
-        // Prepare the current record for the update
         $currentRecord = [
             'name'  => $subname,
             'type'  => $type,
@@ -231,9 +236,15 @@ class Bind implements DnsHostingProviderInterface {
             throw new \Exception("Missing data for deleting RRset");
         }
 
+        $typeUpper = strtoupper($type);
+
+        if (in_array($typeUpper, ['TXT', 'SPF'], true)) {
+            $value = $this->stripOuterQuotes($value);
+        }
+
         $record = [
             'name'  => $subname,
-            'type'  => strtoupper($type),
+            'type'  => $typeUpper,
             'rdata' => $value,
         ];
 
@@ -244,6 +255,15 @@ class Bind implements DnsHostingProviderInterface {
 
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
+    }
+
+    private function stripOuterQuotes(string $value): string
+    {
+        $value = trim($value);
+        if (strlen($value) >= 2 && $value[0] === '"' && $value[strlen($value) - 1] === '"') {
+            return substr($value, 1, -1);
+        }
+        return $value;
     }
 
 }
