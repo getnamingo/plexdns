@@ -523,10 +523,8 @@ class PowerDNS implements DnsHostingProviderInterface {
             throw new \InvalidArgumentException('Domain name cannot be empty');
         }
 
-        // Let PowerDNS generate & activate a default DNSSEC keyset for this zone.
         $this->client->cryptokeys($domainName)->create(true);
 
-        // Return the DS records for the now-signed zone.
         return $this->getDSRecords($domainName);
     }
 
@@ -537,10 +535,22 @@ class PowerDNS implements DnsHostingProviderInterface {
         }
 
         $cryptokeys = $this->client->cryptokeys($domainName);
-        $keys       = $cryptokeys->get();
 
+        $keys = $cryptokeys->getKeys();
+
+        if (empty($keys)) {
+            return true;
+        }
+
+        $ids = [];
         foreach ($keys as $key) {
-            $key->delete();
+            if (method_exists($key, 'getId')) {
+                $ids[] = $key->getId();
+            }
+        }
+
+        if (!empty($ids)) {
+            $cryptokeys->deleteKeys(...$ids);
         }
 
         return true;
@@ -553,24 +563,24 @@ class PowerDNS implements DnsHostingProviderInterface {
         }
 
         $cryptokeys = $this->client->cryptokeys($domainName);
-        $keys       = $cryptokeys->get();
+
+        $keys = $cryptokeys->getActiveKeys();
 
         $enabled = false;
         $details = [];
 
         foreach ($keys as $key) {
-            $active    = $key->isActive();
-            $published = $key->isPublished();
-            $ds        = $key->getDs();
-            $id        = $key->getId();
+            $published = method_exists($key, 'isPublished') ? $key->isPublished() : true;
+            $ds        = method_exists($key, 'getDs') ? $key->getDs() : [];
+            $id        = method_exists($key, 'getId') ? $key->getId() : null;
 
-            if ($active && $published && !empty($ds)) {
+            if ($published && !empty($ds)) {
                 $enabled = true;
             }
 
             $details[] = [
                 'id'        => $id,
-                'active'    => $active,
+                'active'    => true,
                 'published' => $published,
                 'ds'        => $ds,
             ];
@@ -589,16 +599,20 @@ class PowerDNS implements DnsHostingProviderInterface {
         }
 
         $cryptokeys = $this->client->cryptokeys($domainName);
-        $keys       = $cryptokeys->get();
+
+        $keys = $cryptokeys->getActiveKeys();
 
         $dsRecords = [];
 
         foreach ($keys as $key) {
-            if (!$key->isActive() || !$key->isPublished()) {
+            $published = method_exists($key, 'isPublished') ? $key->isPublished() : true;
+            $dsList    = method_exists($key, 'getDs') ? (array)$key->getDs() : [];
+
+            if (!$published || empty($dsList)) {
                 continue;
             }
 
-            foreach ((array) $key->getDs() as $ds) {
+            foreach ($dsList as $ds) {
                 if (!in_array($ds, $dsRecords, true)) {
                     $dsRecords[] = $ds;
                 }

@@ -43,7 +43,7 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Desec** | `API_KEY` | | ✅ | ✅ |
 | **DNSimple** | `API_KEY` | | ✅ | ❌ |
 | **Hetzner** | `API_KEY` | | 🚧 | ❌ |
-| **PowerDNS** | `API_KEY:POWERDNS_IP` | | ✅ | 🚧 |
+| **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ❌ |
 
 ### Slave Zone Support
