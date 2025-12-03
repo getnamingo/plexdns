@@ -144,6 +144,39 @@ try {
     $domain = $service->createDomain($domainOrder);
     print_r($domain);
 
+    // Step 2b: DNSSEC operations
+    $dnssecConfig = [
+        'provider'    => $providerDisplay,
+        'domain_name' => 'example.com',
+        'apikey'      => $apiKey,
+        // add provider-specific fields here if needed:
+        // 'powerdnsip'           => $powerdnsip,
+        // 'cloudns_auth_id'      => $cloudnsAuthId,
+        // 'cloudns_auth_password'=> $cloudnsAuthPassword,
+    ];
+
+    echo "Enabling DNSSEC...\n";
+    $ds = $service->enableDNSSEC($dnssecConfig);
+    echo "DS records after enable:\n";
+    print_r($ds);
+
+    echo "Getting DNSSEC status...\n";
+    $status = $service->getDNSSECStatus($dnssecConfig);
+    print_r($status);
+
+    echo "Getting DS records only...\n";
+    $dsOnly = $service->getDSRecords($dnssecConfig);
+    print_r($dsOnly);
+
+    // Optional: disable DNSSEC if the provider supports it
+    echo "Disabling DNSSEC (if supported)...\n";
+    try {
+        $service->disableDNSSEC($dnssecConfig);
+        echo "DNSSEC disabled.\n";
+    } catch (Exception $e) {
+        echo "Disable DNSSEC not supported: " . $e->getMessage() . "\n";
+    }
+
     // Step 3: Add a DNS record
     echo "Adding a DNS record...\n";
     $recordData = [
