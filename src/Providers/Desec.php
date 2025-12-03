@@ -129,5 +129,101 @@ class Desec implements DnsHostingProviderInterface {
 
         return $response->getStatusCode() === 204;
     }
-    
+
+    public function enableDNSSEC(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        // deSEC always has DNSSEC enabled by default.
+        // Just return the DS records.
+        $response = $this->client->request('GET', $domainName . '/', [
+            'headers' => $this->headers,
+        ]);
+
+        $data = json_decode((string)$response->getBody(), true);
+
+        $dsRecords = [];
+        if (isset($data['keys']) && is_array($data['keys'])) {
+            foreach ($data['keys'] as $key) {
+                if (!empty($key['ds'])) {
+                    foreach ($key['ds'] as $ds) {
+                        if (!in_array($ds, $dsRecords, true)) {
+                            $dsRecords[] = $ds;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $dsRecords;
+    }
+
+    public function disableDNSSEC(string $domainName): bool
+    {
+        // deSEC does not support disabling DNSSEC at all.
+        throw new \Exception("DNSSEC cannot be disabled on deSEC; it is enforced.");
+    }
+
+    public function getDNSSECStatus(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        $response = $this->client->request('GET', $domainName . '/', [
+            'headers' => $this->headers,
+        ]);
+
+        $data = json_decode((string)$response->getBody(), true);
+
+        $dsRecords = [];
+        $keys = $data['keys'] ?? [];
+
+        foreach ($keys as $key) {
+            if (!empty($key['ds'])) {
+                foreach ($key['ds'] as $ds) {
+                    if (!in_array($ds, $dsRecords, true)) {
+                        $dsRecords[] = $ds;
+                    }
+                }
+            }
+        }
+
+        return [
+            'enabled' => !empty($dsRecords),
+            'ds'      => $dsRecords,
+            'keys'    => $keys,
+        ];
+    }
+
+    public function getDSRecords(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        $response = $this->client->request('GET', $domainName . '/', [
+            'headers' => $this->headers,
+        ]);
+
+        $data = json_decode((string)$response->getBody(), true);
+
+        $dsRecords = [];
+
+        if (isset($data['keys']) && is_array($data['keys'])) {
+            foreach ($data['keys'] as $key) {
+                if (!empty($key['ds'])) {
+                    foreach ($key['ds'] as $ds) {
+                        if (!in_array($ds, $dsRecords, true)) {
+                            $dsRecords[] = $ds;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $dsRecords;
+    } 
 }

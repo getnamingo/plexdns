@@ -224,4 +224,112 @@ class ClouDNS implements DnsHostingProviderInterface {
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
     }
+
+    public function enableDNSSEC(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new Exception("Domain name cannot be empty");
+        }
+
+        // Activate DNSSEC for the zone
+        $this->request('activate-dnssec.json', [
+            'domain-name' => $domainName,
+        ]);
+
+        // After activation, return the DS records
+        return $this->getDSRecords($domainName);
+    }
+
+    public function disableDNSSEC(string $domainName): bool
+    {
+        if ($domainName === '') {
+            throw new Exception("Domain name cannot be empty");
+        }
+
+        // Deactivate DNSSEC for the zone
+        $this->request('deactivate-dnssec.json', [
+            'domain-name' => $domainName,
+        ]);
+
+        return true;
+    }
+
+    public function getDNSSECStatus(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new Exception("Domain name cannot be empty");
+        }
+
+        // 1) Check if DNSSEC is available at all for this zone
+        $available = false;
+        $result = $this->request('is-dnssec-available.json', [
+            'domain-name' => $domainName,
+        ]);
+
+        // is-dnssec-available returns plain 1/0 JSON, so it decodes to int 1 or 0
+        if ($result === 1 || $result === '1') {
+            $available = true;
+        }
+
+        // 2) Check if DNSSEC is actually enabled (i.e. DS records exist)
+        $dsRecords = $this->getDSRecords($domainName);
+
+        return [
+            'available' => $available,
+            'enabled'   => !empty($dsRecords),
+            'ds'        => $dsRecords,
+        ];
+    }
+
+    public function getDSRecords(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new Exception("Domain name cannot be empty");
+        }
+
+        try {
+            $data = $this->request('get-dnssec-ds-records.json', [
+                'domain-name' => $domainName,
+            ]);
+        } catch (Exception $e) {
+            // If DNSSEC is not active, ClouDNS returns statusDescription "dnssec_not_active"
+            if (strpos($e->getMessage(), 'dnssec_not_active') !== false) {
+                return [];
+            }
+            throw $e;
+        }
+
+        $dsRecords = [];
+
+        // ClouDNS returns "Array with DS record and record's parameters."
+        // We try to extract a usable DS string for each entry.
+        if (is_array($data)) {
+            foreach ($data as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+
+                if (!empty($entry['record'])) {
+                    // Some APIs provide a ready DS line
+                    $ds = $entry['record'];
+                } elseif (
+                    isset($entry['key-tag'], $entry['algorithm'], $entry['digest-type'], $entry['digest'])
+                ) {
+                    // Build DS line manually if only components are given
+                    $ds = $entry['key-tag'] . ' ' .
+                          $entry['algorithm'] . ' ' .
+                          $entry['digest-type'] . ' ' .
+                          $entry['digest'];
+                } else {
+                    continue;
+                }
+
+                if (!in_array($ds, $dsRecords, true)) {
+                    $dsRecords[] = $ds;
+                }
+            }
+        }
+
+        return $dsRecords;
+    }
 }

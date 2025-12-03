@@ -650,6 +650,84 @@ class Service
     }
 
     /**
+     * Enable DNSSEC at the provider and return DS records.
+     *
+     * @param array $config Must contain at least: provider, domain_name and provider auth data.
+     */
+    public function enableDNSSEC(array $config): array
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException("Missing provider or domain_name for DNSSEC enable.");
+        }
+
+        $domainName = $config['domain_name'];
+
+        $this->chooseDnsProvider($config);
+        if ($this->dnsProvider === null) {
+            throw new \RuntimeException("DNS provider is not set.");
+        }
+
+        return $this->dnsProvider->enableDNSSEC($domainName);
+    }
+
+    /**
+     * Disable DNSSEC at the provider (if supported).
+     */
+    public function disableDNSSEC(array $config): bool
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException("Missing provider or domain_name for DNSSEC disable.");
+        }
+
+        $domainName = $config['domain_name'];
+
+        $this->chooseDnsProvider($config);
+        if ($this->dnsProvider === null) {
+            throw new \RuntimeException("DNS provider is not set.");
+        }
+
+        return $this->dnsProvider->disableDNSSEC($domainName);
+    }
+
+    /**
+     * Get DNSSEC status (enabled/available + DS info) from the provider.
+     */
+    public function getDNSSECStatus(array $config): array
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException("Missing provider or domain_name for DNSSEC status.");
+        }
+
+        $domainName = $config['domain_name'];
+
+        $this->chooseDnsProvider($config);
+        if ($this->dnsProvider === null) {
+            throw new \RuntimeException("DNS provider is not set.");
+        }
+
+        return $this->dnsProvider->getDNSSECStatus($domainName);
+    }
+
+    /**
+     * Get DS records for a domain from the provider.
+     */
+    public function getDSRecords(array $config): array
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException("Missing provider or domain_name for DS lookup.");
+        }
+
+        $domainName = $config['domain_name'];
+
+        $this->chooseDnsProvider($config);
+        if ($this->dnsProvider === null) {
+            throw new \RuntimeException("DNS provider is not set.");
+        }
+
+        return $this->dnsProvider->getDSRecords($domainName);
+    }
+
+    /**
      * Creates the database structure to store the DNS records in.
      *
      * @return bool Returns true on successful installation.

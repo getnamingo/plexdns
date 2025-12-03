@@ -517,4 +517,94 @@ class PowerDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
+    public function enableDNSSEC(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        // Let PowerDNS generate & activate a default DNSSEC keyset for this zone.
+        $this->client->cryptokeys($domainName)->create(true);
+
+        // Return the DS records for the now-signed zone.
+        return $this->getDSRecords($domainName);
+    }
+
+    public function disableDNSSEC(string $domainName): bool
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        $cryptokeys = $this->client->cryptokeys($domainName);
+        $keys       = $cryptokeys->get();
+
+        foreach ($keys as $key) {
+            $key->delete();
+        }
+
+        return true;
+    }
+
+    public function getDNSSECStatus(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        $cryptokeys = $this->client->cryptokeys($domainName);
+        $keys       = $cryptokeys->get();
+
+        $enabled = false;
+        $details = [];
+
+        foreach ($keys as $key) {
+            $active    = $key->isActive();
+            $published = $key->isPublished();
+            $ds        = $key->getDs();
+            $id        = $key->getId();
+
+            if ($active && $published && !empty($ds)) {
+                $enabled = true;
+            }
+
+            $details[] = [
+                'id'        => $id,
+                'active'    => $active,
+                'published' => $published,
+                'ds'        => $ds,
+            ];
+        }
+
+        return [
+            'enabled' => $enabled,
+            'keys'    => $details,
+        ];
+    }
+
+    public function getDSRecords(string $domainName): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+
+        $cryptokeys = $this->client->cryptokeys($domainName);
+        $keys       = $cryptokeys->get();
+
+        $dsRecords = [];
+
+        foreach ($keys as $key) {
+            if (!$key->isActive() || !$key->isPublished()) {
+                continue;
+            }
+
+            foreach ((array) $key->getDs() as $ds) {
+                if (!in_array($ds, $dsRecords, true)) {
+                    $dsRecords[] = $ds;
+                }
+            }
+        }
+
+        return $dsRecords;
+    }
 }

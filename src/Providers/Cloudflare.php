@@ -237,4 +237,89 @@ class Cloudflare implements DnsHostingProviderInterface {
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
     }
+
+    public function enableDNSSEC(string $domainName): array
+    {
+        $zoneId = $this->zones->getZoneID($domainName);
+
+        // Enable DNSSEC
+        $response = $this->adapter->request(
+            'PATCH',
+            "zones/$zoneId/dnssec",
+            [
+                'headers' => ['Content-Type' => 'application/json'],
+                'json' => ['status' => 'active']
+            ]
+        );
+
+        $data = json_decode($response->getBody(), true);
+
+        if ($data['success'] !== true) {
+            throw new \Exception("Failed to enable DNSSEC: " . json_encode($data['errors']));
+        }
+
+        return $this->getDSRecords($domainName);
+    }
+
+    public function disableDNSSEC(string $domainName): bool
+    {
+        $zoneId = $this->zones->getZoneID($domainName);
+
+        $response = $this->adapter->request(
+            'PATCH',
+            "zones/$zoneId/dnssec",
+            [
+                'headers' => ['Content-Type' => 'application/json'],
+                'json' => ['status' => 'disabled']
+            ]
+        );
+
+        $data = json_decode($response->getBody(), true);
+
+        return $data['success'] === true;
+    }
+
+    public function getDNSSECStatus(string $domainName): array
+    {
+        $zoneId = $this->zones->getZoneID($domainName);
+
+        $response = $this->adapter->request(
+            'GET',
+            "zones/$zoneId/dnssec",
+            ['headers' => ['Content-Type' => 'application/json']]
+        );
+
+        $data = json_decode($response->getBody(), true);
+
+        if ($data['success'] !== true) {
+            throw new \Exception("DNSSEC status query failed");
+        }
+
+        return [
+            'enabled' => $data['result']['status'] === 'active',
+            'ds'      => $data['result']['ds'] ?? null,
+            'details' => $data['result']
+        ];
+    }
+
+    public function getDSRecords(string $domainName): array
+    {
+        $zoneId = $this->zones->getZoneID($domainName);
+
+        $response = $this->adapter->request(
+            'GET',
+            "zones/$zoneId/dnssec",
+            ['headers' => ['Content-Type' => 'application/json']]
+        );
+
+        $data = json_decode($response->getBody(), true);
+
+        if ($data['success'] !== true) {
+            return [];
+        }
+
+        $ds = $data['result']['ds'] ?? null;
+
+        return $ds ? [$ds] : [];
+    }
 }

@@ -211,5 +211,24 @@ class Vultr implements DnsHostingProviderInterface {
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
     }
-    
+
+    public function enableDNSSEC(string $domainName): array
+    {
+        throw new \Exception("DNSSEC activation is not supported by this DNS provider.");
+    }
+
+    public function disableDNSSEC(string $domainName): bool
+    {
+        throw new \Exception("DNSSEC deactivation is not supported by this DNS provider.");
+    }
+
+    public function getDNSSECStatus(string $domainName): array
+    {
+        throw new \Exception("DNSSEC status lookup is not supported by this DNS provider.");
+    }
+
+    public function getDSRecords(string $domainName): array
+    {
+        throw new \Exception("Retrieving DS records is not supported by this DNS provider.");
+    }
 }
