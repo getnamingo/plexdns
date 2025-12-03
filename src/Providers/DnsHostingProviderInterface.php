@@ -25,7 +25,7 @@ interface DnsHostingProviderInterface {
      *
      * @return array<mixed> List of domains / zones.
      */
-    public function listDomains(): array;
+    public function listDomains();
 
     /**
      * Get metadata/details for a single domain / zone.
@@ -33,7 +33,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return array<mixed> Domain details.
      */
-    public function getDomain(string $domainName): array;
+    public function getDomain(string $domainName);
 
     /**
      * Resolve which zone is authoritative for the given FQDN.
@@ -41,7 +41,7 @@ interface DnsHostingProviderInterface {
      * @param string $qname Fully qualified domain name.
      * @return string|null Authoritative zone name or null if none found.
      */
-    public function getResponsibleDomain(string $qname): ?string;
+    public function getResponsibleDomain(string $qname);
 
     /**
      * Export a domain / zone as a standard zonefile.
@@ -49,7 +49,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return string Zonefile content.
      */
-    public function exportDomainAsZonefile(string $domainName): string;
+    public function exportDomainAsZonefile(string $domainName);
 
     /**
      * Delete a DNS zone / domain from the provider.
@@ -57,7 +57,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return bool True on success.
      */
-    public function deleteDomain(string $domainName): bool;
+    public function deleteDomain(string $domainName);
 
     /**
      * Create a single RRset within a zone.
@@ -83,7 +83,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return array<mixed> List of records.
      */
-    public function retrieveAllRRsets(string $domainName): array;
+    public function retrieveAllRRsets(string $domainName);
 
     /**
      * Retrieve a specific RRset by name and type.
@@ -93,7 +93,7 @@ interface DnsHostingProviderInterface {
      * @param string $type    RR type (A, AAAA, MX, etc.).
      * @return array<mixed> Matching RRset data.
      */
-    public function retrieveSpecificRRset(string $domainName, string $subname, string $type): array;
+    public function retrieveSpecificRRset(string $domainName, string $subname, string $type);
 
     /**
      * Modify a single RRset.
@@ -124,7 +124,7 @@ interface DnsHostingProviderInterface {
      * @param string $value  Record content/value to match.
      * @return bool True on success.
      */
-    public function deleteRRset(string $domainName, string $subname, string $type, string $value): bool;
+    public function deleteRRset(string $domainName, string $subname, string $type, string $value);
 
     /**
      * Delete multiple RRsets in bulk.
@@ -145,7 +145,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return array<mixed> Provider-specific status / key info.
      */
-    public function enableDNSSEC(string $domainName): array;
+    public function enableDNSSEC(string $domainName);
 
     /**
      * Disable DNSSEC for the given domain.
@@ -157,7 +157,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return bool True on success.
      */
-    public function disableDNSSEC(string $domainName): bool;
+    public function disableDNSSEC(string $domainName);
 
     /**
      * Get current DNSSEC status and key/DS information.
@@ -171,7 +171,7 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return array<mixed>
      */
-    public function getDNSSECStatus(string $domainName): array;
+    public function getDNSSECStatus(string $domainName);
 
     /**
      * Get DS records suitable for publishing at the registry.
@@ -185,5 +185,5 @@ interface DnsHostingProviderInterface {
      * @param string $domainName
      * @return array<int,array<string,mixed>>
      */
-    public function getDSRecords(string $domainName): array;
+    public function getDSRecords(string $domainName);
 }
