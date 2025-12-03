@@ -301,34 +301,37 @@ class ClouDNS implements DnsHostingProviderInterface {
 
         $dsRecords = [];
 
-        // ClouDNS returns "Array with DS record and record's parameters."
-        // We try to extract a usable DS string for each entry.
-        if (is_array($data)) {
-            foreach ($data as $entry) {
-                if (!is_array($entry)) {
-                    continue;
-                }
-
-                if (!empty($entry['record'])) {
-                    // Some APIs provide a ready DS line
-                    $ds = $entry['record'];
-                } elseif (
-                    isset($entry['key-tag'], $entry['algorithm'], $entry['digest-type'], $entry['digest'])
+        // ClouDNS: structured records
+        if (!empty($data['ds_records']) && is_array($data['ds_records'])) {
+            foreach ($data['ds_records'] as $entry) {
+                if (
+                    isset($entry['key_tag'], $entry['algorithm'], $entry['digest_type'], $entry['digest'])
                 ) {
-                    // Build DS line manually if only components are given
-                    $ds = $entry['key-tag'] . ' ' .
+                    $ds = $entry['key_tag'] . ' ' .
                           $entry['algorithm'] . ' ' .
-                          $entry['digest-type'] . ' ' .
+                          $entry['digest_type'] . ' ' .
                           $entry['digest'];
-                } else {
-                    continue;
-                }
 
-                if (!in_array($ds, $dsRecords, true)) {
                     $dsRecords[] = $ds;
                 }
             }
         }
+
+        // ClouDNS: fallback full DS lines
+        if (!empty($data['ds']) && is_array($data['ds'])) {
+            foreach ($data['ds'] as $line) {
+                if (!is_string($line)) {
+                    continue;
+                }
+
+                $parts = preg_split('/\s+/', trim($line));
+                if (count($parts) >= 4) {
+                    $dsRecords[] = implode(' ', array_slice($parts, -4));
+                }
+            }
+        }
+
+        $dsRecords = array_values(array_unique($dsRecords));
 
         return $dsRecords;
     }
