@@ -3,6 +3,10 @@
 use Dotenv\Dotenv;
 use PlexDNS\Service;
 
+// Optional table name overrides
+// define('PLEX_TABLE_ZONES', 'plexdns_zones');
+// define('PLEX_TABLE_RECORDS', 'plexdns_records');
+
 require_once 'vendor/autoload.php';
 
 function getProviderCredentials(string $provider): ?array {

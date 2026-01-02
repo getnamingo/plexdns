@@ -127,7 +127,7 @@ class Service
 
         if ($dbDriver === 'mysql') {
             $query = "
-                INSERT INTO zones (client_id, config, domain_name, created_at, updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
                 VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
                 ON DUPLICATE KEY UPDATE
                     config = VALUES(config),
@@ -135,14 +135,14 @@ class Service
             ";
         } elseif ($dbDriver === 'pgsql') {
             $query = "
-                INSERT INTO zones (client_id, config, domain_name, created_at, updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
                 VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
                 ON CONFLICT (domain_name) DO UPDATE 
                 SET config = EXCLUDED.config, updated_at = EXCLUDED.updated_at
             ";
         } elseif ($dbDriver === 'sqlite') {
             $query = "
-                INSERT INTO zones (client_id, config, domain_name, created_at, updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
                 VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
                 ON CONFLICT(domain_name) DO UPDATE SET
                     config = excluded.config,
@@ -203,7 +203,7 @@ class Service
         }
 
         // Step 2: Delete domain from database
-        $query = "SELECT id FROM zones WHERE domain_name = :domain_name";
+        $query = "SELECT id FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
         $params = [':domain_name' => $domainName];
 
         try {
@@ -216,11 +216,11 @@ class Service
                 throw new \RuntimeException("Domain $domainName not found in the database.");
             }
 
-            $query = "DELETE FROM records WHERE domain_id = :domain_id";
+            $query = "DELETE FROM " . plexRecordsTable() . " WHERE domain_id = :domain_id";
             $params = [':domain_id' => $domainId];
             $this->executeQuery($query, $params);
 
-            $query = "DELETE FROM zones WHERE id = :domain_id";
+            $query = "DELETE FROM " . plexZonesTable() . " WHERE id = :domain_id";
             $params = [':domain_id' => $domainId];
             $this->executeQuery($query, $params);
 
@@ -247,7 +247,7 @@ class Service
         }
 
         $domainName = $data['domain_name'];
-        $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
+        $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
         $domainId   = $domain[0]['id'];
 
@@ -282,7 +282,7 @@ class Service
         if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['A', 'TXT', 'MX'], true)) {
             // Fetch existing records for same host + type
             $existing = $this->fetchData(
-                "SELECT value, priority FROM records
+                "SELECT value, priority FROM " . plexRecordsTable() . "
                  WHERE domain_id = :domain_id AND type = :type AND host = :host",
                 [
                     ':domain_id' => $domainId,
@@ -336,7 +336,7 @@ class Service
 
         // Step 5: Add record to the database
         $insertQuery = "
-            INSERT INTO records (domain_id, type, host, value, ttl, priority, created_at, updated_at, recordId)
+            INSERT INTO " . plexRecordsTable() . " (domain_id, type, host, value, ttl, priority, created_at, updated_at, recordId)
             VALUES (:domain_id, :type, :host, :value, :ttl, :priority, :created_at, :updated_at, :record_id)
         ";
         $params = [
@@ -380,7 +380,7 @@ class Service
         $recordId = $data['record_id'];
 
         // Fetch the domain configuration
-        $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
+        $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
@@ -403,7 +403,7 @@ class Service
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT recordId, value, priority
-                 FROM records
+                 FROM " . plexRecordsTable() . "
                  WHERE domain_id = :domain_id AND type = :type AND host = :host",
                 [
                     ':domain_id' => $domainId,
@@ -474,7 +474,7 @@ class Service
 
         // Update the record in the database
         $updateQuery = "
-            UPDATE records
+            UPDATE " . plexRecordsTable() . "
             SET ttl = :ttl,
                 value = :value,
                 priority = :priority,
@@ -494,7 +494,7 @@ class Service
             $this->executeQuery($updateQuery, $updateParams);
 
             $zoneUpdateQuery = "
-                UPDATE zones
+                UPDATE " . plexZonesTable() . "
                 SET updated_at = :updated_at
                 WHERE id = :domain_id
             ";
@@ -531,7 +531,7 @@ class Service
         $host = $data['record_name'];
 
         // Fetch the domain configuration
-        $query = "SELECT * FROM zones WHERE domain_name = :domain_name";
+        $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
@@ -551,7 +551,7 @@ class Service
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT recordId, value, priority
-                 FROM records
+                 FROM " . plexRecordsTable() . "
                  WHERE domain_id = :domain_id AND type = :type AND host = :host",
                 [
                     ':domain_id' => $domainId,
@@ -620,7 +620,7 @@ class Service
 
         // DB: delete ONLY this one row
         $deleteQuery = "
-            DELETE FROM records
+            DELETE FROM " . plexRecordsTable() . "
             WHERE recordId = :record_id AND domain_id = :domain_id
         ";
         $deleteParams = [
@@ -632,7 +632,7 @@ class Service
             $this->executeQuery($deleteQuery, $deleteParams);
 
             $zoneUpdateQuery = "
-                UPDATE zones
+                UPDATE " . plexZonesTable() . "
                 SET updated_at = :updated_at
                 WHERE id = :domain_id
             ";
@@ -739,8 +739,8 @@ class Service
         $dbDriver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
 
         if ($dbDriver === 'mysql') {
-            $sqlZones = '
-                CREATE TABLE IF NOT EXISTS `zones` (
+            $sqlZones = "
+                CREATE TABLE IF NOT EXISTS `" . plexZonesTable() . "` (
                     `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
                     `client_id` BIGINT(20) NOT NULL,
                     `domain_name` VARCHAR(75),
@@ -752,10 +752,10 @@ class Service
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `uniq_domain_name` (`domain_name`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ';
+            ";
 
-            $sqlRecords = '
-                CREATE TABLE IF NOT EXISTS `records` (
+            $sqlRecords = "
+                CREATE TABLE IF NOT EXISTS `" . plexRecordsTable() . "` (
                     `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
                     `domain_id` BIGINT(20) NOT NULL,
                     `recordId` VARCHAR(100) DEFAULT NULL,
@@ -767,12 +767,12 @@ class Service
                     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (`id`),
-                    FOREIGN KEY (`domain_id`) REFERENCES `zones`(`id`) ON DELETE CASCADE
+                    FOREIGN KEY (`domain_id`) REFERENCES `" . plexZonesTable() . "`(`id`) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ';
+            ";
         } elseif ($dbDriver === 'pgsql') {
-            $sqlZones = '
-                CREATE TABLE IF NOT EXISTS zones (
+            $sqlZones = "
+                CREATE TABLE IF NOT EXISTS " . plexZonesTable() . " (
                     id BIGSERIAL PRIMARY KEY,
                     client_id BIGINT NOT NULL,
                     domain_name VARCHAR(75) NOT NULL,
@@ -783,10 +783,10 @@ class Service
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT uniq_domain_name UNIQUE (domain_name)
                 );
-            ';
+            ";
 
-            $sqlRecords = '
-                CREATE TABLE IF NOT EXISTS records (
+            $sqlRecords = "
+                CREATE TABLE IF NOT EXISTS " . plexRecordsTable() . " (
                     id BIGSERIAL PRIMARY KEY,
                     domain_id BIGINT NOT NULL,
                     recordId VARCHAR(100) DEFAULT NULL,
@@ -797,12 +797,12 @@ class Service
                     priority INTEGER DEFAULT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (domain_id) REFERENCES zones(id) ON DELETE CASCADE
+                    FOREIGN KEY (domain_id) REFERENCES " . plexZonesTable() . "(id) ON DELETE CASCADE
                 );
-            ';
+            ";
         } elseif ($dbDriver === 'sqlite') {
-            $sqlZones = '
-                CREATE TABLE IF NOT EXISTS zones (
+            $sqlZones = "
+                CREATE TABLE IF NOT EXISTS " . plexZonesTable() . " (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     client_id INTEGER NOT NULL,
                     domain_name TEXT UNIQUE NOT NULL,
@@ -812,10 +812,10 @@ class Service
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
-            ';
+            ";
 
-            $sqlRecords = '
-                CREATE TABLE IF NOT EXISTS records (
+            $sqlRecords = "
+                CREATE TABLE IF NOT EXISTS " . plexRecordsTable() . " (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     domain_id INTEGER NOT NULL,
                     recordId TEXT DEFAULT NULL,
@@ -826,9 +826,9 @@ class Service
                     priority INTEGER DEFAULT NULL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (domain_id) REFERENCES zones(id) ON DELETE CASCADE
+                    FOREIGN KEY (domain_id) REFERENCES " . plexZonesTable() . "(id) ON DELETE CASCADE
                 );
-            ';
+            ";
 
             // Enable foreign keys for SQLite
             $this->db->exec("PRAGMA foreign_keys = ON;");
@@ -854,8 +854,8 @@ class Service
      */
     public function uninstall(): bool
     {
-        $sqlRecords = 'DROP TABLE IF EXISTS records';
-        $sqlZones = 'DROP TABLE IF EXISTS zones';
+        $sqlRecords = "DROP TABLE IF EXISTS " . plexRecordsTable();
+        $sqlZones = "DROP TABLE IF EXISTS " . plexZonesTable();
 
         try {
             $this->db->exec($sqlRecords);
@@ -890,7 +890,7 @@ class Service
         }
 
         // Step 1: Fetch all domains from the database
-        $sqlFetchDomains = 'SELECT * FROM zones';
+        $sqlFetchDomains = "SELECT * FROM " . plexZonesTable();
         $domains = $this->fetchData($sqlFetchDomains);
 
         if (!$domains) {
@@ -911,7 +911,7 @@ class Service
                     echo "Updating configuration for domain '{$domainName}'...\n";
 
                     $updateQuery = "
-                        UPDATE zones
+                        UPDATE " . plexZonesTable() . "
                         SET config = :config, updated_at = :updated_at
                         WHERE id = :id
                     ";

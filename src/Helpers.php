@@ -5,6 +5,31 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Formatter\LineFormatter;
 
+if (!defined('PLEX_TABLE_ZONES')) {
+    define('PLEX_TABLE_ZONES', 'zones');
+}
+if (!defined('PLEX_TABLE_RECORDS')) {
+    define('PLEX_TABLE_RECORDS', 'records');
+}
+
+function plexTableName(string $name): string
+{
+    if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+        throw new \InvalidArgumentException("Invalid table name: {$name}");
+    }
+    return $name;
+}
+
+function plexZonesTable(): string
+{
+    return plexTableName(PLEX_TABLE_ZONES);
+}
+
+function plexRecordsTable(): string
+{
+    return plexTableName(PLEX_TABLE_RECORDS);
+}
+
 /**
  * Sets up and returns a Logger instance.
  * 
@@ -51,7 +76,7 @@ function setupPlexLogger($logFilePath, $channelName = 'app') {
 function saveRecordId(PDO $pdo, string $domainName, string $recordId, array $rrsetData): int
 {
     // Step 1: Fetch the domain ID
-    $sqlDomain = "SELECT id FROM zones WHERE domain_name = :domainName LIMIT 1";
+    $sqlDomain = "SELECT id FROM " . plexZonesTable() . " WHERE domain_name = :domainName LIMIT 1";
     $stmtDomain = $pdo->prepare($sqlDomain);
     $stmtDomain->bindParam(':domainName', $domainName, PDO::PARAM_STR);
     $stmtDomain->execute();
@@ -66,7 +91,7 @@ function saveRecordId(PDO $pdo, string $domainName, string $recordId, array $rrs
 
     // Step 2: Update the recordId
     $sqlUpdate = "
-        UPDATE records 
+        UPDATE " . plexRecordsTable() . " 
         SET recordId = :recordId 
         WHERE type = :type AND host = :subname AND value = :value AND domain_id = :domain_id
     ";
@@ -101,7 +126,7 @@ function saveRecordId(PDO $pdo, string $domainName, string $recordId, array $rrs
 function getRecordId(PDO $pdo, string $domainName, string $type, string $subname, array|string $valueOrRrsetData): string
 {
     // Step 1: Fetch the domain ID
-    $sqlDomain = "SELECT id FROM zones WHERE domain_name = :domainName LIMIT 1";
+    $sqlDomain = "SELECT id FROM " . plexZonesTable() . " WHERE domain_name = :domainName LIMIT 1";
     $stmtDomain = $pdo->prepare($sqlDomain);
     $stmtDomain->execute([':domainName' => $domainName]);
 
@@ -121,7 +146,7 @@ function getRecordId(PDO $pdo, string $domainName, string $type, string $subname
     // Step 2: Fetch the record ID
     $sqlRecord = "
         SELECT recordId 
-        FROM records 
+        FROM " . plexRecordsTable() . " 
         WHERE type = :type AND host = :subname AND domain_id = :domain_id and value = :value
     ";
     $stmtRecord = $pdo->prepare($sqlRecord);
@@ -152,7 +177,7 @@ function getRecordId(PDO $pdo, string $domainName, string $type, string $subname
  */
 function saveZoneId(PDO $pdo, string $domainName, string $zoneId): int
 {
-    $sql = "UPDATE zones SET zoneId = :zoneId WHERE domain_name = :domainName";
+    $sql = "UPDATE " . plexZonesTable() . " SET zoneId = :zoneId WHERE domain_name = :domainName";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':zoneId', $zoneId, PDO::PARAM_STR);
     $stmt->bindParam(':domainName', $domainName, PDO::PARAM_STR);
@@ -176,7 +201,7 @@ function saveZoneId(PDO $pdo, string $domainName, string $zoneId): int
  */
 function getZoneId(PDO $pdo, string $domainName): array
 {
-    $sql = "SELECT id, zoneId FROM zones WHERE domain_name = :domainName LIMIT 1";
+    $sql = "SELECT id, zoneId FROM " . plexZonesTable() . " WHERE domain_name = :domainName LIMIT 1";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(':domainName', $domainName, PDO::PARAM_STR);
     $stmt->execute();
