@@ -37,6 +37,9 @@ class Service
             case 'Bind':
                 $this->dnsProvider = new Providers\Bind($config);
                 break;
+            case 'Bunny':
+                $this->dnsProvider = new Providers\Bunny($config);
+                break;
             case 'Cloudflare':
                 $this->dnsProvider = new Providers\Cloudflare($config);
                 break;
