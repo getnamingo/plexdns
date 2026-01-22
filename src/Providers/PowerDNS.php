@@ -121,12 +121,19 @@ class PowerDNS implements DnsHostingProviderInterface {
         );
 
         try {
-            $this->client->createZone($domainName, $formattedNsRecords);
+            $zoneName = rtrim($domainName, '.') . '.';
+
+            $newZone = new ZoneResource();
+            $newZone->setName($zoneName);
+            $newZone->setKind('Master');
+            $newZone->setMasters([]);
+            $newZone->setNameservers($formattedNsRecords);
+            $this->client->createZoneFromResource($newZone);
 
             if (!empty($this->masterIp)) {
                 foreach ($this->slaveClients as $slaveClient) {
                     $newZone = new ZoneResource();
-                    $newZone->setName($domainName);
+                    $newZone->setName($zoneName);
                     $newZone->setKind('Slave');
                     $newZone->setMasters([$this->masterIp]);
                     $slaveClient->createZoneFromResource($newZone);
@@ -166,10 +173,11 @@ class PowerDNS implements DnsHostingProviderInterface {
             throw new \Exception("Domain name cannot be empty");
         }
 
-        $this->client->deleteZone($domainName);
+        $zoneName = rtrim($domainName, '.') . '.';
+        $this->client->deleteZone($zoneName);
 
         foreach ($this->slaveClients as $slaveClient) {
-            $slaveClient->deleteZone($domainName);
+            $slaveClient->deleteZone($zoneName);
         }
 
         return json_decode($domainName, true);
