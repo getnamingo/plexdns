@@ -20,7 +20,12 @@ class Bunny implements DnsHostingProviderInterface
         'TXT'   => 3,
         'MX'    => 4,
         'RDR'   => 5,
+        'SRV'   => 8,
+        'CAA'   => 9,
         'NS'    => 12,
+        'SVCB'  => 13,
+        'HTTPS' => 14,
+        'TLSA'  => 15,
     ];
 
     public function __construct($config)
@@ -199,6 +204,9 @@ class Bunny implements DnsHostingProviderInterface
 
                 if (isset($rrsetData['accelerated'])) $payload['Accelerated'] = (bool)$rrsetData['accelerated'];
                 if (isset($rrsetData['weight'])) $payload['Weight'] = (int)$rrsetData['weight'];
+                if (isset($rrsetData['port'])) $payload['Port'] = (int)$rrsetData['port'];
+                if (isset($rrsetData['flags'])) $payload['Flags'] = (int)$rrsetData['flags'];
+                if (isset($rrsetData['tag'])) $payload['Tag'] = (string)$rrsetData['tag'];
 
                 $response = $this->request('PUT', '/dnszone/' . $zoneId . '/records', $payload);
                 if (!is_array($response) || !isset($response['Id']) || !is_numeric($response['Id'])) {
@@ -337,6 +345,9 @@ class Bunny implements DnsHostingProviderInterface
 
             if (isset($rrsetData['accelerated'])) $payload['Accelerated'] = (bool)$rrsetData['accelerated'];
             if (isset($rrsetData['weight'])) $payload['Weight'] = (int)$rrsetData['weight'];
+            if (isset($rrsetData['port'])) $payload['Port'] = (int)$rrsetData['port'];
+            if (isset($rrsetData['flags'])) $payload['Flags'] = (int)$rrsetData['flags'];
+            if (isset($rrsetData['tag'])) $payload['Tag'] = (string)$rrsetData['tag'];
 
             $this->request('POST', '/dnszone/' . $zoneId . '/records/' . (int)$recordId, $payload);
 
