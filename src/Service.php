@@ -293,6 +293,12 @@ class Service
             }
         }
 
+        if ($data['record_type'] === 'SRV') {
+            $rrsetData['priority'] = $data['record_priority'];
+            $rrsetData['weight'] = $data['record_weight'];
+            $rrsetData['port'] = $data['record_port'];
+        }
+
         $useModify = false;
 
         if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['A', 'TXT', 'MX'], true)) {
@@ -489,6 +495,12 @@ class Service
                 } else {
                     $rrsetData['priority'] = $data['record_priority'];
                 }
+            }
+
+            if ($type === 'SRV') {
+                $rrsetData['priority'] = $data['record_priority'];
+                $rrsetData['weight'] = $data['record_weight'];
+                $rrsetData['port'] = $data['record_port'];
             }
 
             try {
