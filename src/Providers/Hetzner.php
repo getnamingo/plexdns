@@ -3,6 +3,7 @@
 namespace PlexDNS\Providers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use PDO;
 
@@ -95,7 +96,7 @@ class Hetzner implements DnsHostingProviderInterface {
             } else {
                 return false;
             }
-        } catch (\GuzzleException $e) {
+        } catch (GuzzleException $e) {
             throw new \exception('Request failed: ' . $e->getMessage());
         }
     }
@@ -192,7 +193,7 @@ class Hetzner implements DnsHostingProviderInterface {
         try {
             $result  = getZoneId($this->pdo, $domainName);
             $zoneId  = $result['zoneId'];
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
+            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
         } catch (\PDOException $e) {
             throw new \Exception("Error in operation: " . $e->getMessage());
         }
@@ -235,7 +236,7 @@ class Hetzner implements DnsHostingProviderInterface {
 
     public function deleteRRset($domainName, $subname, $type, $value) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname);
+            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
 
             $response = $this->client->request('DELETE', "records/{$recordId}", [
                 'headers' => $this->headers,
