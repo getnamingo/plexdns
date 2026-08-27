@@ -30,6 +30,14 @@ class Service
     {
         $providerName = $config['provider'];
 
+        if ($providerName === 'Bunny' && !empty($config['domain_name'])) {
+            $domain = $this->fetchData(
+                "SELECT zoneId FROM " . plexZonesTable() . " WHERE domain_name = :domain_name",
+                [':domain_name' => $config['domain_name']]
+            );
+            $config['zone_id'] = $domain[0]['zoneId'] ?? null;
+        }
+
         switch ($providerName) {
             case 'AnycastDNS':
                 $this->dnsProvider = new Providers\AnycastDNS($config);
@@ -118,7 +126,7 @@ class Service
 
         // Step 1: Create domain in DNS
         try {
-            $this->dnsProvider->createDomain($domainName);
+            $providerDomain = $this->dnsProvider->createDomain($domainName);
         } catch (\Throwable $e) {
             throw new \RuntimeException("Failed to create domain in DNS: " . $e->getMessage());
         }
@@ -130,25 +138,27 @@ class Service
 
         if ($dbDriver === 'mysql') {
             $query = "
-                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
-                VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, zoneId, created_at, updated_at)
+                VALUES (:client_id, :config, :domain_name, :zone_id, :created_at, :updated_at)
                 ON DUPLICATE KEY UPDATE
                     config = VALUES(config),
+                    zoneId = VALUES(zoneId),
                     updated_at = VALUES(updated_at)
             ";
         } elseif ($dbDriver === 'pgsql') {
             $query = "
-                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
-                VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, zoneId, created_at, updated_at)
+                VALUES (:client_id, :config, :domain_name, :zone_id, :created_at, :updated_at)
                 ON CONFLICT (domain_name) DO UPDATE 
-                SET config = EXCLUDED.config, updated_at = EXCLUDED.updated_at
+                SET config = EXCLUDED.config, zoneId = EXCLUDED.zoneId, updated_at = EXCLUDED.updated_at
             ";
         } elseif ($dbDriver === 'sqlite') {
             $query = "
-                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
-                VALUES (:client_id, :config, :domain_name, :created_at, :updated_at)
+                INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, zoneId, created_at, updated_at)
+                VALUES (:client_id, :config, :domain_name, :zone_id, :created_at, :updated_at)
                 ON CONFLICT(domain_name) DO UPDATE SET
                     config = excluded.config,
+                    zoneId = excluded.zoneId,
                     updated_at = excluded.updated_at
             ";
         } else {
@@ -159,6 +169,9 @@ class Service
             ':client_id' => $clientId,
             ':config' => json_encode(['provider' => $config['provider'] ?? null]),
             ':domain_name' => $domainName,
+            ':zone_id' => is_array($providerDomain) && isset($providerDomain['Id'])
+                ? (string)$providerDomain['Id']
+                : null,
             ':created_at' => $now,
             ':updated_at' => $now,
         ];
@@ -280,6 +293,12 @@ class Service
             }
         }
 
+        if ($data['record_type'] === 'SRV') {
+            $rrsetData['priority'] = $data['record_priority'];
+            $rrsetData['weight'] = $data['record_weight'];
+            $rrsetData['port'] = $data['record_port'];
+        }
+
         $useModify = false;
 
         if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['A', 'TXT', 'MX'], true)) {
@@ -392,6 +411,15 @@ class Service
 
         $domainId = $domain[0]['id'];
 
+        $record = $this->fetchData(
+            "SELECT recordId FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            [':record_id' => $recordId, ':domain_id' => $domainId]
+        );
+        if (!$record) {
+            throw new \RuntimeException("Record does not exist.");
+        }
+        $providerRecordId = $record[0]['recordId'];
+
         // Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
@@ -405,7 +433,7 @@ class Service
         if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
-                "SELECT recordId, value, priority
+                "SELECT id, recordId, value, priority
                  FROM " . plexRecordsTable() . "
                  WHERE domain_id = :domain_id AND type = :type AND host = :host",
                 [
@@ -421,7 +449,7 @@ class Service
 
             $records = [];
             foreach ($rows as $row) {
-                if ($row['recordId'] === $recordId) {
+                if ((string)$row['id'] === (string)$recordId) {
                     // This is the one being edited – use the NEW value
                     if ($type === 'MX') {
                         $records[] = (int)$data['record_priority'] . ' ' . $data['record_value'];
@@ -455,6 +483,7 @@ class Service
             $rrsetData = [
                 'ttl'     => (int)$data['record_ttl'],
                 'records' => [$data['record_value']],
+                'record_id' => $providerRecordId,
             ];
             if (!empty($data['old_value'])) {
                 $rrsetData['old_value'] = $data['old_value'];
@@ -466,6 +495,12 @@ class Service
                 } else {
                     $rrsetData['priority'] = $data['record_priority'];
                 }
+            }
+
+            if ($type === 'SRV') {
+                $rrsetData['priority'] = $data['record_priority'];
+                $rrsetData['weight'] = $data['record_weight'];
+                $rrsetData['port'] = $data['record_port'];
             }
 
             try {
@@ -482,7 +517,7 @@ class Service
                 value = :value,
                 priority = :priority,
                 updated_at = :updated_at
-            WHERE recordId = :record_id AND domain_id = :domain_id
+            WHERE id = :record_id AND domain_id = :domain_id
         ";
         $updateParams = [
             ':ttl'        => (int)$data['record_ttl'],
@@ -543,6 +578,15 @@ class Service
 
         $domainId = $domain[0]['id'];
 
+        $record = $this->fetchData(
+            "SELECT recordId FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            [':record_id' => $recordId, ':domain_id' => $domainId]
+        );
+        if (!$record) {
+            throw new \RuntimeException("Record does not exist.");
+        }
+        $providerRecordId = $record[0]['recordId'];
+
         // Set up the DNS provider
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
@@ -553,7 +597,7 @@ class Service
         if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
-                "SELECT recordId, value, priority
+                "SELECT id, recordId, value, priority
                  FROM " . plexRecordsTable() . "
                  WHERE domain_id = :domain_id AND type = :type AND host = :host",
                 [
@@ -570,7 +614,7 @@ class Service
             $records = [];
             foreach ($rows as $row) {
                 // Skip the one being deleted
-                if ($row['recordId'] === $recordId) {
+                if ((string)$row['id'] === (string)$recordId) {
                     continue;
                 }
 
@@ -608,7 +652,17 @@ class Service
             // Default behaviour: delete whole RRset for non-deSEC or non-multi types
             try {
                 if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                    $this->dnsProvider->deleteRRset($domainName, $host, $type, $data['record_value'] ?? null);
+                    if ($data['provider'] === 'Bunny') {
+                        $this->dnsProvider->deleteRRset(
+                            $domainName,
+                            $host,
+                            $type,
+                            $data['record_value'] ?? null,
+                            $providerRecordId
+                        );
+                    } else {
+                        $this->dnsProvider->deleteRRset($domainName, $host, $type, $data['record_value'] ?? null);
+                    }
                 } else {
                     // Or however you previously deleted a record for other providers
                     $this->dnsProvider->modifyRRset($domainName, $host, $type, [
@@ -624,7 +678,7 @@ class Service
         // DB: delete ONLY this one row
         $deleteQuery = "
             DELETE FROM " . plexRecordsTable() . "
-            WHERE recordId = :record_id AND domain_id = :domain_id
+            WHERE id = :record_id AND domain_id = :domain_id
         ";
         $deleteParams = [
             ':record_id' => $recordId,

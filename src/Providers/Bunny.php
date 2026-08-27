@@ -20,7 +20,12 @@ class Bunny implements DnsHostingProviderInterface
         'TXT'   => 3,
         'MX'    => 4,
         'RDR'   => 5,
-        'NS'    => 6,
+        'SRV'   => 8,
+        'CAA'   => 9,
+        'NS'    => 12,
+        'SVCB'  => 13,
+        'HTTPS' => 14,
+        'TLSA'  => 15,
     ];
 
     public function __construct($config)
@@ -30,6 +35,12 @@ class Bunny implements DnsHostingProviderInterface
             throw new \Exception("API token cannot be empty");
         }
         $this->apiKey = $key;
+
+        $domainName = $config['domain_name'] ?? null;
+        $zoneId = $config['zone_id'] ?? null;
+        if (is_string($domainName) && is_numeric($zoneId)) {
+            $this->zoneIdCache[$this->normalizeDomain($domainName)] = (int)$zoneId;
+        }
     }
 
     /* ---------------------------
@@ -178,6 +189,7 @@ class Bunny implements DnsHostingProviderInterface
                 $priority = isset($rrsetData['priority']) ? (int)$rrsetData['priority'] : 10;
             }
 
+            $recordIds = [];
             foreach ($values as $val) {
                 $payload = [
                     'Type' => $typeId,
@@ -192,11 +204,18 @@ class Bunny implements DnsHostingProviderInterface
 
                 if (isset($rrsetData['accelerated'])) $payload['Accelerated'] = (bool)$rrsetData['accelerated'];
                 if (isset($rrsetData['weight'])) $payload['Weight'] = (int)$rrsetData['weight'];
+                if (isset($rrsetData['port'])) $payload['Port'] = (int)$rrsetData['port'];
+                if (isset($rrsetData['flags'])) $payload['Flags'] = (int)$rrsetData['flags'];
+                if (isset($rrsetData['tag'])) $payload['Tag'] = (string)$rrsetData['tag'];
 
-                $this->request('PUT', '/dnszone/' . $zoneId . '/records', $payload);
+                $response = $this->request('PUT', '/dnszone/' . $zoneId . '/records', $payload);
+                if (!is_array($response) || !isset($response['Id']) || !is_numeric($response['Id'])) {
+                    throw new \Exception("Bunny did not return a record ID");
+                }
+                $recordIds[] = (int)$response['Id'];
             }
 
-            return true;
+            return count($recordIds) === 1 ? $recordIds[0] : $recordIds;
         } catch (\Throwable $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }
@@ -274,30 +293,32 @@ class Bunny implements DnsHostingProviderInterface
         try {
             $zoneId = $this->resolveZoneId($domainName);
 
-            $lookupData = $rrsetData['old_value'] ?? ($rrsetData['records'][0] ?? null);
-            if ($lookupData === null) {
-                throw new \Exception("No value provided to locate record. Provide rrsetData['old_value'] or rrsetData['records'][0].");
-            }
-
-            $records = $this->retrieveAllRRsets($domainName);
-
             $targetTypeId = isset($rrsetData['type_id'])
                 ? (int)$rrsetData['type_id']
                 : $this->mapTypeToId($typeStr);
 
-            $recordId = null;
+            $lookupData = null;
+            $recordId = isset($rrsetData['record_id']) && is_numeric($rrsetData['record_id'])
+                ? (int)$rrsetData['record_id']
+                : null;
             $found = null;
 
-            foreach ($records as $r) {
-                if (!is_array($r)) continue;
+            if ($recordId === null) {
+                $lookupData = $rrsetData['old_value'] ?? ($rrsetData['records'][0] ?? null);
+                if ($lookupData === null) {
+                    throw new \Exception("No value provided to locate record. Provide rrsetData['old_value'] or rrsetData['records'][0].");
+                }
 
-                if ((string)($r['Name'] ?? '') !== $subname) continue;
-                if ((int)($r['Type'] ?? -1) !== (int)$targetTypeId) continue;
-                if ((string)($r['Value'] ?? '') !== (string)$lookupData) continue;
+                foreach ($this->retrieveAllRRsets($domainName) as $r) {
+                    if (!is_array($r)) continue;
+                    if ((string)($r['Name'] ?? '') !== $subname) continue;
+                    if ((int)($r['Type'] ?? -1) !== $targetTypeId) continue;
+                    if ((string)($r['Value'] ?? '') !== (string)$lookupData) continue;
 
-                $recordId = $r['Id'] ?? null;
-                $found = $r;
-                break;
+                    $recordId = $r['Id'] ?? null;
+                    $found = $r;
+                    break;
+                }
             }
 
             if ($recordId === null) {
@@ -324,6 +345,9 @@ class Bunny implements DnsHostingProviderInterface
 
             if (isset($rrsetData['accelerated'])) $payload['Accelerated'] = (bool)$rrsetData['accelerated'];
             if (isset($rrsetData['weight'])) $payload['Weight'] = (int)$rrsetData['weight'];
+            if (isset($rrsetData['port'])) $payload['Port'] = (int)$rrsetData['port'];
+            if (isset($rrsetData['flags'])) $payload['Flags'] = (int)$rrsetData['flags'];
+            if (isset($rrsetData['tag'])) $payload['Tag'] = (string)$rrsetData['tag'];
 
             $this->request('POST', '/dnszone/' . $zoneId . '/records/' . (int)$recordId, $payload);
 
@@ -355,7 +379,7 @@ class Bunny implements DnsHostingProviderInterface
         }
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value)
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null)
     {
         $domainName = $this->normalizeDomain((string)$domainName);
         $subname = (string)($subname ?? '');
@@ -365,21 +389,21 @@ class Bunny implements DnsHostingProviderInterface
         try {
             $zoneId = $this->resolveZoneId($domainName);
 
-            $records = $this->retrieveAllRRsets($domainName);
-            $targetTypeId = $this->mapTypeToId($typeStr);
+            $recordId = is_numeric($persistedRecordId) ? (int)$persistedRecordId : null;
 
-            $recordId = null;
+            if ($recordId === null) {
+                $targetTypeId = $this->mapTypeToId($typeStr);
+                foreach ($this->retrieveAllRRsets($domainName) as $r) {
+                    if (!is_array($r)) continue;
 
-            foreach ($records as $r) {
-                if (!is_array($r)) continue;
+                    if ((int)($r['Type'] ?? -1) !== $targetTypeId) continue;
+                    if ((string)($r['Name'] ?? '') !== $subname) continue;
 
-                if ((int)($r['Type'] ?? -1) !== (int)$targetTypeId) continue;
-                if ((string)($r['Name'] ?? '') !== $subname) continue;
+                    if ($value !== '' && (string)($r['Value'] ?? '') !== $value) continue;
 
-                if ($value !== '' && (string)($r['Value'] ?? '') !== $value) continue;
-
-                $recordId = $r['Id'] ?? null;
-                if ($recordId !== null) break;
+                    $recordId = $r['Id'] ?? null;
+                    if ($recordId !== null) break;
+                }
             }
 
             if ($recordId === null) {
@@ -520,10 +544,13 @@ class Bunny implements DnsHostingProviderInterface
         foreach ($zones as $z) {
             if (!is_array($z)) continue;
             $d = strtolower(rtrim((string)($z['Domain'] ?? ''), '.'));
-            if ($d === $domainName && isset($z['Id']) && is_numeric($z['Id'])) {
-                $this->zoneIdCache[$domainName] = (int)$z['Id'];
-                return (int)$z['Id'];
+            if ($d !== '' && isset($z['Id']) && is_numeric($z['Id'])) {
+                $this->zoneIdCache[$d] = (int)$z['Id'];
             }
+        }
+
+        if (isset($this->zoneIdCache[$domainName])) {
+            return $this->zoneIdCache[$domainName];
         }
 
         throw new \Exception("Bunny DNS zone not found for domain: {$domainName}");
