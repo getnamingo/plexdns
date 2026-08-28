@@ -124,6 +124,10 @@ class DNSimple implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
+    public function sync(PDO $db, string $domainName): int {
+        throw new \PlexDNS\UnsupportedProviderException('DNSimple synchronization is not supported.');
+    }
+
     public function retrieveSpecificRRset($domainName, $subname, $type) {
         throw new \Exception("Not yet implemented");
     }
