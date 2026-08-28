@@ -714,6 +714,21 @@ class Service
     }
 
     /**
+     * Refresh locally cached records from the configured provider.
+     *
+     * @param array $config Must contain at least: provider, domain_name and provider auth data.
+     */
+    public function sync(array $config): int
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException('Missing provider or domain_name for synchronization.');
+        }
+
+        $this->chooseDnsProvider($config);
+        return $this->dnsProvider->sync($this->db, $config['domain_name']);
+    }
+
+    /**
      * Enable DNSSEC at the provider and return DS records.
      *
      * @param array $config Must contain at least: provider, domain_name and provider auth data.

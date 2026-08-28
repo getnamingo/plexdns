@@ -5,7 +5,6 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use PlexDNS\Providers\Testing;
-use PlexDNS\Providers\AnycastDNS;
 use PlexDNS\Providers\Bunny;
 use PlexDNS\Service;
 use PlexDNS\UnsupportedProviderException;
@@ -71,7 +70,10 @@ $service->updateRecord([
 expect($provider->retrieveSpecificRRset('example.test', 'www', 'A')[0]['records'] === ['192.0.2.2'], 'Expected updated A record.');
 
 $beforeSync = $db->query('SELECT * FROM ' . plexRecordsTable() . ' WHERE id = ' . $recordId)->fetch(PDO::FETCH_ASSOC);
-expect($provider->sync($db, 'example.test') === 1, 'Testing sync must return the cached record count.');
+expect(
+    $service->sync(['provider' => 'Testing', 'domain_name' => 'example.test']) === 1,
+    'Service sync must return the provider cached record count.'
+);
 $afterSync = $db->query('SELECT * FROM ' . plexRecordsTable() . ' WHERE id = ' . $recordId)->fetch(PDO::FETCH_ASSOC);
 expect($afterSync === $beforeSync, 'Testing sync must not rewrite cached records.');
 
@@ -134,7 +136,7 @@ expect(
 );
 
 try {
-    (new AnycastDNS(['apikey' => 'test']))->sync($db, 'bunny.test');
+    $service->sync(['provider' => 'AnycastDNS', 'domain_name' => 'bunny.test', 'apikey' => 'test']);
     throw new RuntimeException('Expected unsupported provider synchronization to fail.');
 } catch (UnsupportedProviderException) {
 }
