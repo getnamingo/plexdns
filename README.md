@@ -47,6 +47,24 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ❌ |
 
+### Testing Provider
+
+`PlexDNS\Providers\Testing` lets projects exercise `PlexDNS\Service` without
+contacting a DNS provider. Use it only with a fresh in-memory SQLite connection:
+
+```php
+$pdo = new PDO('sqlite::memory:');
+$service = new PlexDNS\Service($pdo);
+$service->install();
+
+$config = ['provider' => 'Testing'];
+```
+
+The SQLite `zones` and `records` tables are the source of truth. This provider
+does not publish, resolve, validate, propagate, or persist DNS data and must not
+be used in production. Its DNSSEC support only simulates enabled/disabled state;
+it does not create keys or DS records.
+
 ### Slave Zone Support
 
 Different DNS providers handle slave (secondary) zones differently. **BIND9 and PowerDNS require explicit slave configuration**, meaning you must manually add the slave servers to your `$config` array for them to sync from the master. This involves passing the necessary API details, such as `apikey_nsX` and `bindip_nsX` for BIND9 or `powerdnsip_nsX` for PowerDNS. In contrast, **cloud-based DNS providers handle replication automatically**, so there is no need to configure slave servers manually. Once a zone is added, it is automatically synchronized across their global infrastructure without additional setup.
