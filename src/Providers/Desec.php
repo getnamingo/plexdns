@@ -89,6 +89,10 @@ class Desec implements DnsHostingProviderInterface {
         return json_decode($response->getBody(), true);
     }
 
+    public function sync(\PDO $db, string $domainName): int {
+        throw new \PlexDNS\UnsupportedProviderException('Desec synchronization is not supported.');
+    }
+
     public function retrieveSpecificRRset($domainName, $subname, $type) {
         $response = $this->client->request('GET', $domainName . '/rrsets/' . $subname . '/' . $type . '/', ['headers' => $this->headers]);
         return json_decode($response->getBody(), true);

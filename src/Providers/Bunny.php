@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PlexDNS\Providers;
 
+use PDO;
+
 class Bunny implements DnsHostingProviderInterface
 {
     private const API_BASE = 'https://api.bunny.net';
@@ -252,6 +254,82 @@ class Bunny implements DnsHostingProviderInterface
         } catch (\Throwable $e) {
             throw new \Exception("Error retrieving records: " . $e->getMessage());
         }
+    }
+
+    public function sync(PDO $db, string $domainName): int
+    {
+        $domainName = $this->normalizeDomain($domainName);
+        if (strlen($domainName) > 253) {
+            throw new \InvalidArgumentException('A valid domain is required.');
+        }
+
+        $zoneStatement = $db->prepare(
+            'SELECT id, zoneId, config FROM ' . plexZonesTable() . ' WHERE domain_name = :domain'
+        );
+        $zoneStatement->execute([':domain' => $domainName]);
+        $zone = $zoneStatement->fetch(PDO::FETCH_ASSOC);
+
+        if ($zone === false) {
+            throw new \InvalidArgumentException('Zone not found.');
+        }
+
+        $config = json_decode((string)$zone['config'], true);
+        if (!is_array($config) || ($config['provider'] ?? null) !== 'Bunny') {
+            throw new \InvalidArgumentException('The DNS zone provider does not match Bunny.');
+        }
+        if (empty($zone['zoneId']) || !is_numeric($zone['zoneId'])) {
+            throw new \InvalidArgumentException('Zone is not a Bunny DNS zone.');
+        }
+
+        $this->zoneIdCache[$domainName] = (int)$zone['zoneId'];
+        $rows = $this->normalizeRecords($this->retrieveAllRRsets($domainName));
+        $now = date('Y-m-d H:i:s');
+
+        $db->beginTransaction();
+        try {
+            $lockSql = 'SELECT id FROM ' . plexZonesTable() . ' WHERE id = :id';
+            if (in_array($db->getAttribute(PDO::ATTR_DRIVER_NAME), ['mysql', 'pgsql'], true)) {
+                $lockSql .= ' FOR UPDATE';
+            }
+            $lock = $db->prepare($lockSql);
+            $lock->execute([':id' => $zone['id']]);
+            if ($lock->fetchColumn() === false) {
+                throw new \RuntimeException('Zone was removed while it was being synchronized.');
+            }
+
+            $delete = $db->prepare('DELETE FROM ' . plexRecordsTable() . ' WHERE domain_id = :domain_id');
+            $delete->execute([':domain_id' => $zone['id']]);
+
+            $insert = $db->prepare(
+                'INSERT INTO ' . plexRecordsTable() .
+                ' (domain_id, recordId, type, host, value, ttl, priority, created_at, updated_at)' .
+                ' VALUES (:domain_id, :record_id, :type, :host, :value, :ttl, :priority, :created_at, :updated_at)'
+            );
+            foreach ($rows as $row) {
+                $insert->execute([
+                    ':domain_id' => $zone['id'],
+                    ':record_id' => $row['recordId'],
+                    ':type' => $row['type'],
+                    ':host' => $row['host'],
+                    ':value' => $row['value'],
+                    ':ttl' => $row['ttl'],
+                    ':priority' => $row['priority'],
+                    ':created_at' => $now,
+                    ':updated_at' => $now,
+                ]);
+            }
+
+            $update = $db->prepare('UPDATE ' . plexZonesTable() . ' SET updated_at = :updated_at WHERE id = :id');
+            $update->execute([':updated_at' => $now, ':id' => $zone['id']]);
+            $db->commit();
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
+
+        return count($rows);
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type)
@@ -515,6 +593,41 @@ class Bunny implements DnsHostingProviderInterface
         }
 
         return $domain;
+    }
+
+    /** @return array<int,array{recordId:string,type:string,host:string,value:string,ttl:int,priority:?int}> */
+    private function normalizeRecords(array $records): array
+    {
+        $types = array_flip(self::TYPE_MAP);
+        $rows = [];
+
+        foreach ($records as $record) {
+            if (!is_array($record) || !isset($record['Id'], $record['Type']) || !is_numeric($record['Id'])) {
+                throw new \RuntimeException('Bunny returned an invalid DNS record.');
+            }
+
+            $typeId = (int)$record['Type'];
+            if (!isset($types[$typeId])) {
+                throw new \RuntimeException("Bunny returned unsupported record type {$typeId}.");
+            }
+
+            $type = $types[$typeId];
+            $value = (string)($record['Value'] ?? '');
+            if ($type === 'SRV') {
+                $value = (int)($record['Weight'] ?? 0) . ' ' . (int)($record['Port'] ?? 0) . ' ' . $value;
+            }
+
+            $rows[] = [
+                'recordId' => (string)$record['Id'],
+                'type' => $type,
+                'host' => (string)($record['Name'] ?? ''),
+                'value' => $value,
+                'ttl' => (int)($record['Ttl'] ?? 0) > 0 ? (int)$record['Ttl'] : 3600,
+                'priority' => isset($record['Priority']) ? (int)$record['Priority'] : null,
+            ];
+        }
+
+        return $rows;
     }
 
     private function mapTypeToId(string $type): int

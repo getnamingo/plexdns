@@ -126,6 +126,10 @@ class Cloudflare implements DnsHostingProviderInterface {
         }
     }
 
+    public function sync(\PDO $db, string $domainName): int {
+        throw new \PlexDNS\UnsupportedProviderException('Cloudflare synchronization is not supported.');
+    }
+
     public function retrieveSpecificRRset($domainName, $subname, $type) {
         try {
             $zoneId = $this->zones->getZoneID($domainName);

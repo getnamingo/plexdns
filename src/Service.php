@@ -368,7 +368,9 @@ class Service
             ':domain_id' => $domainId,
             ':type' => $data['record_type'],
             ':host' => $data['record_name'],
-            ':value' => $data['record_value'],
+            ':value' => $data['record_type'] === 'SRV'
+                ? (int)$data['record_weight'] . ' ' . (int)$data['record_port'] . ' ' . $data['record_value']
+                : $data['record_value'],
             ':ttl' => (int) $data['record_ttl'],
             ':priority' => isset($data['record_priority']) ? (int) $data['record_priority'] : 0,
             ':created_at' => date('Y-m-d H:i:s'),
@@ -524,7 +526,9 @@ class Service
         ";
         $updateParams = [
             ':ttl'        => (int)$data['record_ttl'],
-            ':value'      => $data['record_value'],
+            ':value'      => $type === 'SRV'
+                ? (int)$data['record_weight'] . ' ' . (int)$data['record_port'] . ' ' . $data['record_value']
+                : $data['record_value'],
             ':priority'   => isset($data['record_priority']) ? (int)$data['record_priority'] : 0,
             ':updated_at' => date('Y-m-d H:i:s'),
             ':record_id'  => $recordId,
@@ -707,6 +711,21 @@ class Service
         }
 
         return true;
+    }
+
+    /**
+     * Refresh locally cached records from the configured provider.
+     *
+     * @param array $config Must contain at least: provider, domain_name and provider auth data.
+     */
+    public function sync(array $config): int
+    {
+        if (empty($config['provider']) || empty($config['domain_name'])) {
+            throw new \RuntimeException('Missing provider or domain_name for synchronization.');
+        }
+
+        $this->chooseDnsProvider($config);
+        return $this->dnsProvider->sync($this->db, $config['domain_name']);
     }
 
     /**

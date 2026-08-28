@@ -93,7 +93,7 @@ final class Testing implements DnsHostingProviderInterface
         $lines = [];
         foreach ($this->retrieveAllRRsets($domainName) as $rrset) {
             foreach ($rrset['records'] as $record) {
-                $value = $rrset['type'] === 'MX'
+                $value = in_array($rrset['type'], ['MX', 'SRV'], true)
                     ? $rrset['priority'] . ' ' . $record
                     : $record;
                 $lines[] = sprintf(
@@ -134,6 +134,29 @@ final class Testing implements DnsHostingProviderInterface
     public function retrieveAllRRsets(string $domainName): array
     {
         return $this->retrieveRRsets($domainName);
+    }
+
+    public function sync(PDO $db, string $domainName): int
+    {
+        $domainName = $this->normalizeDomain($domainName);
+        $statement = $db->prepare(
+            'SELECT id, config FROM ' . plexZonesTable() . ' WHERE domain_name = :domain'
+        );
+        $statement->execute([':domain' => $domainName]);
+        $zone = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if ($zone === false) {
+            throw new \InvalidArgumentException('Zone not found.');
+        }
+
+        $config = json_decode((string)$zone['config'], true);
+        if (!is_array($config) || ($config['provider'] ?? null) !== 'Testing') {
+            throw new \InvalidArgumentException('The DNS zone provider does not match Testing.');
+        }
+
+        $count = $db->prepare('SELECT COUNT(*) FROM ' . plexRecordsTable() . ' WHERE domain_id = :domain_id');
+        $count->execute([':domain_id' => $zone['id']]);
+        return (int)$count->fetchColumn();
     }
 
     public function retrieveSpecificRRset(string $domainName, string $subname, string $type): array

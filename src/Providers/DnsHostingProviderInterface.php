@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PlexDNS\Providers;
 
+use PDO;
+
 /**
  * Contract for DNS hosting providers used by PlexDNS.
  *
@@ -84,6 +86,13 @@ interface DnsHostingProviderInterface {
      * @return array<mixed> List of records.
      */
     public function retrieveAllRRsets(string $domainName);
+
+    /**
+     * Replace the locally cached records with the provider's current records.
+     *
+     * @return int Number of cached records.
+     */
+    public function sync(PDO $db, string $domainName): int;
 
     /**
      * Retrieve a specific RRset by name and type.
