@@ -38,6 +38,9 @@
     },
     "scripts": {
         "analyze": "phpstan analyse src --level=0 --memory-limit=512M",
-        "test": "@analyze"
+        "test": [
+            "php tests/TestingProviderTest.php",
+            "@analyze"
+        ]
     }
 }

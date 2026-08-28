@@ -66,6 +66,9 @@ class Service
             case 'PowerDNS':
                 $this->dnsProvider = new Providers\PowerDNS($config);
                 break;
+            case 'Testing':
+                $this->dnsProvider = new Providers\Testing($this->db);
+                break;
             case 'Vultr':
                 $this->dnsProvider = new Providers\Vultr($config);
                 break;
