@@ -150,11 +150,7 @@ class Hetzner implements DnsHostingProviderInterface {
                 $body     = json_decode($response->getBody()->getContents(), true);
                 $recordId = $body['record']['id'] ?? null;
 
-                if ($recordId !== null) {
-                    saveRecordId($this->pdo, $domainName, $recordId, $rrsetData);
-                }
-
-                return true;
+                return $recordId ?? true;
             }
 
             return false;
@@ -197,7 +193,10 @@ class Hetzner implements DnsHostingProviderInterface {
         try {
             $result  = getZoneId($this->pdo, $domainName);
             $zoneId  = $result['zoneId'];
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
+            $recordId = $rrsetData['record_id'] ?? null;
+            if ($recordId === null || $recordId === '') {
+                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
+            }
         } catch (\PDOException $e) {
             throw new \Exception("Error in operation: " . $e->getMessage());
         }
@@ -238,9 +237,12 @@ class Hetzner implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
+            $recordId = $persistedRecordId;
+            if ($recordId === null || $recordId === '') {
+                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
+            }
 
             $response = $this->client->request('DELETE', "records/{$recordId}", [
                 'headers' => $this->headers,

@@ -146,12 +146,12 @@ class ClouDNS implements DnsHostingProviderInterface {
             $lookupRecord = $targetRecord;  // fallback to new value
         }
 
-        // Fetch all records for the domain
-        $records = $this->request('records.json', [
+        $recordId = $rrsetData['record_id'] ?? null;
+        $recordId = $recordId === '' ? null : $recordId;
+        $records = $recordId === null ? $this->request('records.json', [
             'domain-name' => $domainName,
-        ]);
+        ]) : [];
 
-        $recordId = null;
         foreach ($records as $record) {
             if (
                 isset($record['type'], $record['host'], $record['record']) &&
@@ -192,17 +192,17 @@ class ClouDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null) {
         if (empty($domainName) || empty($type) || empty($value)) {
             throw new Exception("Missing data for deleting RRset");
         }
 
-        // Fetch all records for the domain
-        $records = $this->request('records.json', [
+        $recordId = $persistedRecordId;
+        $recordId = $recordId === '' ? null : $recordId;
+        $records = $recordId === null ? $this->request('records.json', [
             'domain-name' => $domainName
-        ]);
+        ]) : [];
 
-        $recordId = null;
         foreach ($records as $record) {
                 if (
                     $record['host'] === $subname &&

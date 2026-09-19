@@ -107,7 +107,7 @@ class Cloudflare implements DnsHostingProviderInterface {
                 $priority
             );
 
-            return $result === true;
+            return $result === true ? $this->dns->getBody()->result->id : false;
         } catch (\Cloudflare\API\Endpoints\EndpointException $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }
@@ -148,12 +148,6 @@ class Cloudflare implements DnsHostingProviderInterface {
                 ? $domainName
                 : $subname . '.' . $domainName;
 
-            $records = $this->dns->listRecords($zoneId, $type, $targetName);
-
-            if (empty($records->result)) {
-                throw new \Exception("No matching records found for $targetName ($type)");
-            }
-
             $newContent = is_array($rrsetData['records'])
                 ? (string) reset($rrsetData['records'])
                 : (string) $rrsetData['records'];
@@ -162,38 +156,53 @@ class Cloudflare implements DnsHostingProviderInterface {
                 ? (string) $rrsetData['old_value']
                 : $newContent;
 
-            foreach ($records->result as $record) {
-                $recordName   = strtolower($record->name);
-                $expectedName = strtolower($targetName);
+            $recordId = $rrsetData['record_id'] ?? null;
+            $record = null;
+            if ($recordId === null || $recordId === '') {
+                $records = $this->dns->listRecords($zoneId, $type, $targetName);
 
-                if (
-                    $recordName === $expectedName &&
-                    $record->type === strtoupper($type) &&
-                    $record->content === $lookupContent
-                ) {
-                    $details = [
-                        'type'    => strtoupper($type),
-                        'name'    => $record->name,
-                        'content' => $newContent,
-                    ];
+                if (empty($records->result)) {
+                    throw new \Exception("No matching records found for $targetName ($type)");
+                }
 
-                    if (isset($rrsetData['ttl'])) {
-                        $details['ttl'] = (int) $rrsetData['ttl'];
+                foreach ($records->result as $candidate) {
+                    $recordName   = strtolower($candidate->name);
+                    $expectedName = strtolower($targetName);
+
+                    if (
+                        $recordName === $expectedName &&
+                        $candidate->type === strtoupper($type) &&
+                        $candidate->content === $lookupContent
+                    ) {
+                        $record = $candidate;
+                        $recordId = $candidate->id;
+                        break;
                     }
-
-                    if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
-                        if (isset($rrsetData['priority'])) {
-                            $details['priority'] = (int) $rrsetData['priority'];
-                        } elseif (isset($record->priority)) {
-                            $details['priority'] = (int) $record->priority;
-                        }
-                    }
-
-                    return $this->dns->updateRecordDetails($zoneId, $record->id, $details);
+                }
+                if ($record === null) {
+                    throw new \Exception("Record not found for $targetName ($type / $lookupContent)");
                 }
             }
 
-            throw new \Exception("Record not found for $targetName ($type / $lookupContent)");
+            $details = [
+                'type'    => strtoupper($type),
+                'name'    => $record->name ?? $targetName,
+                'content' => $newContent,
+            ];
+
+            if (isset($rrsetData['ttl'])) {
+                $details['ttl'] = (int) $rrsetData['ttl'];
+            }
+
+            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+                if (isset($rrsetData['priority'])) {
+                    $details['priority'] = (int) $rrsetData['priority'];
+                } elseif (isset($record->priority)) {
+                    $details['priority'] = (int) $record->priority;
+                }
+            }
+
+            return $this->dns->updateRecordDetails($zoneId, $recordId, $details);
         } catch (\Exception $e) {
             throw new \Exception("Error modifying record: " . $e->getMessage());
         }
@@ -203,7 +212,7 @@ class Cloudflare implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value)
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null)
     {
         try {
             $zoneId = $this->zones->getZoneID($domainName);
@@ -211,6 +220,12 @@ class Cloudflare implements DnsHostingProviderInterface {
             $targetName = ($subname === '' || $subname === '@' || $subname === null)
                 ? $domainName
                 : $subname . '.' . $domainName;
+
+            if ($persistedRecordId !== null && $persistedRecordId !== '') {
+                $this->dns->deleteRecord($zoneId, $persistedRecordId);
+                $expectedName = strtolower($targetName);
+                return "Record deleted: $expectedName ($type" . ($value !== null ? " -> $value" : "") . ")";
+            }
 
             $records = $this->dns->listRecords($zoneId, $type, $targetName);
 
