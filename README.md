@@ -43,9 +43,28 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ | ✅ |
 | **Desec** | `API_KEY` | | ✅ | ✅ |
 | **DNSimple** | `API_KEY` | | ✅ | ❌ |
-| **Hetzner** | `API_KEY` | | 🚧 | ❌ |
+| **Hetzner** | `API_KEY` | Hetzner Console project token (read/write) | 🚧 | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ❌ |
+
+### Hetzner
+
+The provider uses the [Hetzner Cloud DNS API](https://docs.hetzner.cloud/reference/cloud#zones).
+Set `apikey` / `API_KEY` to a **read/write API token from the Hetzner Console project
+containing your zones**. Old DNS Console tokens do not work with this API.
+Existing zones must be available in that project; the provider addresses them by name
+and ignores old DNS Console zone/record IDs.
+
+Zone and record creation, update and deletion are supported. Other previously
+unimplemented operations (including synchronization and DNSSEC) remain unsupported.
+`createRRset()` still returns a boolean. Its optional ID output is null because the
+Cloud API identifies individual records by their value within a name/type RRSet.
+
+`Service` supplies the saved old value for updates/deletes, including MX/SRV priority.
+Direct provider callers must supply complete RDATA for MX/SRV deletion and `old_value`
+when updating a multi-value RRSet. TXT values are quoted/chunked automatically.
+TTL is shared by all values in an RRSet; adding another value requires the existing
+TTL. Mutations wait for Hetzner's action to succeed before Service changes local data.
 
 ### Testing Provider
 

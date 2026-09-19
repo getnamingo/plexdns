@@ -39,6 +39,8 @@
         "analyze": "phpstan analyse src --level=0 --memory-limit=512M",
         "test": [
             "php tests/TestingProviderTest.php",
+            "php tests/HetznerProviderTest.php",
+            "php tests/HetznerServiceTest.php",
             "@analyze"
         ]
     }
