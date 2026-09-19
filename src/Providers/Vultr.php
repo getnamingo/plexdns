@@ -11,6 +11,7 @@ use Vultr\VultrPhp\VultrClient;
 
 class Vultr implements DnsHostingProviderInterface {
     private $client;
+    private $dnssecClient;
     
     public function __construct($config) {
         $token = $config['apikey'];
@@ -19,6 +20,10 @@ class Vultr implements DnsHostingProviderInterface {
         }
 
         $this->client = VultrClient::create($token);
+        $this->dnssecClient = new \GuzzleHttp\Client([
+            'base_uri' => 'https://api.vultr.com/v2/',
+            'headers' => ['Authorization' => 'Bearer ' . $token],
+        ]);
     }
 
     public function createDomain($domainName) {
@@ -223,21 +228,51 @@ class Vultr implements DnsHostingProviderInterface {
 
     public function enableDNSSEC(string $domainName): array
     {
-        throw new \Exception("DNSSEC activation is not supported by this DNS provider.");
+        $this->setDNSSEC($domainName, 'enabled');
+        return $this->getDSRecords($domainName);
     }
 
     public function disableDNSSEC(string $domainName): bool
     {
-        throw new \Exception("DNSSEC deactivation is not supported by this DNS provider.");
+        $this->setDNSSEC($domainName, 'disabled');
+        return true;
+    }
+
+    private function setDNSSEC(string $domainName, string $status): void
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+        // The API requires PUT; the installed SDK's updateDomain() sends PATCH.
+        $this->dnssecClient->put('domains/' . rawurlencode($domainName), [
+            'json' => ['dns_sec' => $status],
+        ]);
     }
 
     public function getDNSSECStatus(string $domainName): array
     {
-        throw new \Exception("DNSSEC status lookup is not supported by this DNS provider.");
+        $status = $this->client->dns->getDomain($domainName)->getDnsSec();
+        return [
+            'enabled' => $status === 'enabled',
+            'ds' => $status === 'enabled' ? $this->getDSRecords($domainName) : [],
+            'raw' => ['dns_sec' => $status],
+        ];
     }
 
     public function getDSRecords(string $domainName): array
     {
-        throw new \Exception("Retrieving DS records is not supported by this DNS provider.");
+        $records = [];
+        foreach ($this->client->dns->getDNSSecInfo($domainName) as $record) {
+            // This endpoint returns both DNSKEY and DS zone-file records.
+            if (preg_match('/\sIN\s+DS\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-f0-9]+)\s*$/i', $record, $matches)) {
+                $records[] = [
+                    'key_tag' => (int)$matches[1],
+                    'algorithm' => (int)$matches[2],
+                    'digest_type' => (int)$matches[3],
+                    'digest' => $matches[4],
+                ];
+            }
+        }
+        return $records;
     }
 }

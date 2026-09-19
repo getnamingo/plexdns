@@ -264,21 +264,59 @@ class Cloudflare implements DnsHostingProviderInterface {
 
     public function enableDNSSEC(string $domainName): array
     {
-        throw new \Exception("DNSSEC activation is not supported by this DNS provider.");
+        $status = $this->dnssecRequest($domainName, 'active');
+        if (!$status['enabled']) {
+            throw new \RuntimeException('Cloudflare did not enable DNSSEC: ' . $status['status']);
+        }
+        return $status['ds'];
     }
 
     public function disableDNSSEC(string $domainName): bool
     {
-        throw new \Exception("DNSSEC deactivation is not supported by this DNS provider.");
+        $status = $this->dnssecRequest($domainName, 'disabled');
+        return in_array($status['status'], ['disabled', 'pending-disabled'], true);
     }
 
     public function getDNSSECStatus(string $domainName): array
     {
-        throw new \Exception("DNSSEC status lookup is not supported by this DNS provider.");
+        return $this->dnssecRequest($domainName);
     }
 
     public function getDSRecords(string $domainName): array
     {
-        throw new \Exception("Retrieving DS records is not supported by this DNS provider.");
+        return $this->getDNSSECStatus($domainName)['ds'];
+    }
+
+    private function dnssecRequest(string $domainName, ?string $status = null): array
+    {
+        if ($domainName === '') {
+            throw new \InvalidArgumentException('Domain name cannot be empty');
+        }
+        $zoneId = $this->zones->getZoneID($domainName);
+        if (!$zoneId) {
+            throw new \RuntimeException('Cloudflare zone not found: ' . $domainName);
+        }
+        $uri = 'zones/' . $zoneId . '/dnssec';
+        $response = $status === null
+            ? $this->adapter->get($uri)
+            : $this->adapter->patch($uri, ['status' => $status]);
+        $data = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        if (($data['success'] ?? false) !== true || !isset($data['result']['status'])) {
+            throw new \RuntimeException('Cloudflare DNSSEC request failed: ' . json_encode($data['errors'] ?? $data));
+        }
+        $result = $data['result'];
+        // Pending means signing is enabled but the parent DS is not yet validated.
+        $enabled = in_array($result['status'], ['active', 'pending'], true);
+        $ds = [];
+        if ($enabled && isset($result['key_tag'], $result['algorithm'], $result['digest_type'], $result['digest'])
+            && $result['digest'] !== '') {
+            $ds[] = [
+                'key_tag' => (int)$result['key_tag'],
+                'algorithm' => (int)$result['algorithm'],
+                'digest_type' => (int)$result['digest_type'],
+                'digest' => $result['digest'],
+            ];
+        }
+        return ['enabled' => $enabled, 'status' => $result['status'], 'ds' => $ds, 'raw' => $result];
     }
 }

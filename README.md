@@ -39,13 +39,33 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **AnycastDNS** | `API_KEY` | | ✅ | ❌ |
 | **Bind9** | `API_KEY:BIND_IP` | [bind9-api-server](https://github.com/getnamingo/bind9-api-server)/[bind9-api-server-sqlite](https://github.com/getnamingo/bind9-api-server-sqlite) | ✅ | 🚧 |
 | **Bunny** | `API_KEY` | | ✅ | ✅ |
-| **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ | ❌ |
+| **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ | ✅ |
 | **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ | ✅ |
 | **Desec** | `API_KEY` | | ✅ | ✅ |
-| **DNSimple** | `API_KEY` | | ✅ | ❌ |
+| **DNSimple** | `API_KEY` | | ✅ | ✅ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token (read/write) | 🚧 | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
-| **Vultr** | `API_KEY` | | ✅ | ❌ |
+| **Vultr** | `API_KEY` | | ✅ | ✅ |
+
+### DNSSEC
+
+[Cloudflare](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/),
+[DNSimple](https://developer.dnsimple.com/v2/domains/dnssec/) and
+[Vultr](https://github.com/vultr/govultr/blob/master/domain.go) support `enableDNSSEC()`, `disableDNSSEC()`,
+`getDNSSECStatus()` and `getDSRecords()`. Enabling returns DS records; disabling
+returns a boolean. Their DS entries contain `key_tag`, `algorithm`, `digest_type`
+and `digest`. Status includes `enabled`, `ds` and provider details in `raw`.
+Cloudflare also exposes `status`; `pending` counts as enabled signing, but the
+parent DS is not yet validated. Re-query if keys are still being generated.
+
+Publish the returned DS at the registrar when required, and remove the parent DS
+before disabling signing. DNSimple also manages DS publication for domains
+registered with DNSimple. Existing providers retain their current return formats.
+
+AnycastDNS and Hetzner remain unsupported for DNSSEC management: their published
+APIs ([AnycastDNS](https://api.anycastdns.app/),
+[Hetzner](https://docs.hetzner.cloud/reference/cloud#zones)) expose no zone-signing controls. Hosting a DS record for a child zone is a
+separate operation. BIND9 DNSSEC is unchanged.
 
 ### Hetzner
 
