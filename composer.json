@@ -14,7 +14,6 @@
         "badcow/dns": "^4.3",
         "exonet/powerdns-php": "^4.7.1",
         "dnsimple/dnsimple": "^1.4",
-        "namingo/bind9-api-client": "^1.0.3",
         "spatie/dns": "^2.6",
         "monolog/monolog": "^3.9",
         "vlucas/phpdotenv": "^5.6",

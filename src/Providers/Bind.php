@@ -14,7 +14,7 @@
 
 namespace PlexDNS\Providers;
 
-use Namingo\Bind9Api\ApiClient;
+use PlexDNS\Clients\Bind9ApiClient as ApiClient;
 
 class Bind implements DnsHostingProviderInterface {
     private $client;

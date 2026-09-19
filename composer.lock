@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6cea043aa912d9cf332f2427df4204ce",
+    "content-hash": "1ee4153663896f383475464f4d29674f",
     "packages": [
         {
             "name": "badcow/dns",
@@ -1007,47 +1007,6 @@
                 }
             ],
             "time": "2025-01-14T11:49:03+00:00"
-        },
-        {
-            "name": "namingo/bind9-api-client",
-            "version": "v1.0.4",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/getnamingo/bind9-api-client.git",
-                "reference": "ff418cedc48b883f9bde0557d1eea327553ae3cc"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/getnamingo/bind9-api-client/zipball/ff418cedc48b883f9bde0557d1eea327553ae3cc",
-                "reference": "ff418cedc48b883f9bde0557d1eea327553ae3cc",
-                "shasum": ""
-            },
-            "require": {
-                "guzzlehttp/guzzle": "^7.9",
-                "php": ">=8.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Namingo\\Bind9Api\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Namingo Team",
-                    "email": "help@namingo.org"
-                }
-            ],
-            "description": "The bind9-api-client is a PHP client library designed to interact with the bind9-api-server.",
-            "support": {
-                "issues": "https://github.com/getnamingo/bind9-api-client/issues",
-                "source": "https://github.com/getnamingo/bind9-api-client/tree/v1.0.4"
-            },
-            "time": "2026-01-02T23:19:10+00:00"
         },
         {
             "name": "nikic/php-parser",
