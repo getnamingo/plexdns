@@ -41,6 +41,7 @@
             "php tests/TestingProviderTest.php",
             "php tests/HetznerProviderTest.php",
             "php tests/HetznerServiceTest.php",
+            "php tests/ProviderDnssecTest.php",
             "@analyze"
         ]
     }

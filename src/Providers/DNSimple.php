@@ -201,21 +201,47 @@ class DNSimple implements DnsHostingProviderInterface {
 
     public function enableDNSSEC(string $domainName): array
     {
-        throw new \Exception("DNSSEC activation is not supported by this DNS provider.");
+        $this->client->domains->enableDnssec($this->account_id, $domainName);
+        return $this->getDSRecords($domainName);
     }
 
     public function disableDNSSEC(string $domainName): bool
     {
-        throw new \Exception("DNSSEC deactivation is not supported by this DNS provider.");
+        return $this->client->domains->disableDnssec($this->account_id, $domainName)->getStatusCode() === 204;
     }
 
     public function getDNSSECStatus(string $domainName): array
     {
-        throw new \Exception("DNSSEC status lookup is not supported by this DNS provider.");
+        $data = $this->client->domains->getDnssec($this->account_id, $domainName)->getData();
+        return [
+            'enabled' => (bool)$data->enabled,
+            'ds' => $data->enabled ? $this->getDSRecords($domainName) : [],
+            'raw' => (array)$data,
+        ];
     }
 
     public function getDSRecords(string $domainName): array
     {
-        throw new \Exception("Retrieving DS records is not supported by this DNS provider.");
+        $records = [];
+        $page = 1;
+        do {
+            $response = $this->client->domains->listDomainDelegationSignerRecords(
+                $this->account_id, $domainName, ['page' => $page]
+            );
+            foreach ($response->getData() as $record) {
+                // DNSKEY-only delegation entries do not contain a publishable DS.
+                if (!isset($record->keytag, $record->algorithm, $record->digestType, $record->digest)
+                    || $record->digest === '') {
+                    continue;
+                }
+                $records[] = [
+                    'key_tag' => (int)$record->keytag,
+                    'algorithm' => (int)$record->algorithm,
+                    'digest_type' => (int)$record->digestType,
+                    'digest' => $record->digest,
+                ];
+            }
+        } while ($page++ < $response->getPagination()->totalPages);
+        return $records;
     }
 }
