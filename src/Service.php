@@ -419,7 +419,7 @@ class Service
         $domainId = $domain[0]['id'];
 
         $record = $this->fetchData(
-            "SELECT recordId FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            "SELECT recordId, value, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
@@ -499,6 +499,13 @@ class Service
             if (!empty($data['old_value'])) {
                 $rrsetData['old_value'] = $data['old_value'];
             }
+            if ($data['provider'] === 'Hetzner') {
+                // Cloud DNS identifies individual values by their complete RDATA.
+                $rrsetData['old_value'] = $record[0]['value'];
+                if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+                    $rrsetData['old_value'] = (int)$record[0]['priority'] . ' ' . $rrsetData['old_value'];
+                }
+            }
 
             if ($type === 'MX') {
                 if ($data['provider'] === 'Desec') {
@@ -543,6 +550,15 @@ class Service
 
         try {
             $this->executeQuery($updateQuery, $updateParams);
+            if ($data['provider'] === 'Hetzner') {
+                // Hetzner shares one TTL across every value in the RRSet.
+                $this->executeQuery(
+                    "UPDATE " . plexRecordsTable() . " SET ttl = :ttl, updated_at = :updated_at
+                     WHERE domain_id = :domain_id AND host = :host AND type = :type",
+                    [':ttl' => (int)$data['record_ttl'], ':updated_at' => $updateParams[':updated_at'],
+                     ':domain_id' => $domainId, ':host' => $host, ':type' => $type]
+                );
+            }
 
             $zoneUpdateQuery = "
                 UPDATE " . plexZonesTable() . "
@@ -592,11 +608,17 @@ class Service
         $domainId = $domain[0]['id'];
 
         $record = $this->fetchData(
-            "SELECT recordId FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            "SELECT recordId, value, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
             throw new \RuntimeException("Record does not exist.");
+        }
+        if ($data['provider'] === 'Hetzner') {
+            $data['record_value'] = $record[0]['value'];
+            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+                $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
+            }
         }
         $providerRecordId = $record[0]['recordId'];
         // Older versions stored uniqid() placeholders when the provider returned no ID.

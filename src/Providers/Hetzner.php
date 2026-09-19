@@ -3,59 +3,40 @@
 namespace PlexDNS\Providers;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\Exception\RequestException;
 use PDO;
+use Badcow\DNS\Rdata\TXT;
 
 class Hetzner implements DnsHostingProviderInterface {
-    private $baseUrl = "https://dns.hetzner.com/api/v1/";
+    private $baseUrl = "https://api.hetzner.cloud/v1/";
     private $client;
     private $headers;
-    private PDO $pdo;
 
+    // Keep the PDO argument for compatibility; Service owns persistence.
     public function __construct($config, PDO $pdo) {
-        $this->pdo = $pdo;
-        
-        $token = $config['apikey'];
+        $token = $config['apikey'] ?? null;
         if (empty($token)) {
             throw new \Exception("API token cannot be empty");
         }
 
-        $this->client = new Client(['base_uri' => $this->baseUrl]);
+        $this->client = new Client(['base_uri' => $this->baseUrl, 'timeout' => 15, 'connect_timeout' => 5, 'allow_redirects' => false]);
         $this->headers = [
-            'Auth-API-Token' => $token,
+            'Authorization' => 'Bearer ' . $token,
             'Content-Type' => 'application/json',
         ];
     }
 
     public function createDomain($domainName) {
-        if (empty($domainName)) {
-            throw new \Exception("Domain name cannot be empty");
+        $body = $this->request('POST', 'zones', ['json' => [
+            'name' => $this->domainName($domainName),
+            'mode' => 'primary',
+        ]]);
+        $this->waitForAction($body);
+        if (empty($body['zone']['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a zone ID.');
         }
-
-        try {
-            $response = $this->client->request('POST', 'zones', [
-                'headers' => $this->headers,
-                'json'    => ['name' => $domainName],
-            ]);
-
-            $body   = json_decode($response->getBody()->getContents(), true);
-            $zoneId = $body['zone']['id'] ?? null;
-
-            if ($zoneId === null) {
-                throw new \Exception("Hetzner API did not return a zone ID for {$domainName}");
-            }
-
-            try {
-                saveZoneId($this->pdo, $domainName, $zoneId);
-            } catch (\PDOException $e) {
-                throw new \Exception("Error saving zoneId: " . $e->getMessage());
-            }
-
-            return $body;
-        } catch (\Exception $e) {
-            throw new \Exception('Request failed: ' . $e->getMessage());
-        }
+        // Service inserts the local zone after this call and recognizes Id.
+        $body['Id'] = (string)$body['zone']['id'];
+        return $body;
     }
 
     public function listDomains() {
@@ -75,92 +56,29 @@ class Hetzner implements DnsHostingProviderInterface {
     }
 
     public function deleteDomain($domainName) {
-        if (empty($domainName)) {
-            throw new \Exception("Domain name cannot be empty");
-        }
-        
-        try {
-            $result = getZoneId($this->pdo, $domainName);
-            $zoneId = $result['zoneId'];
-        } catch (\PDOException $e) {
-            throw new \Exception("Error fetching zoneId: " . $e->getMessage());
-        }
-
-        try {
-            $response = $this->client->request('DELETE', "zones/{$zoneId}", [
-                'headers' => $this->headers,
-            ]);
-
-            if ($response->getStatusCode() === 204) {
-                return true;
-            } else {
-                return false;
-            }
-        } catch (GuzzleException $e) {
-            throw new \exception('Request failed: ' . $e->getMessage());
-        }
+        $this->waitForAction($this->request('DELETE', $this->zonePath($domainName)));
+        return true;
     }
 
     /** Optional $createdRecordId output preserves the boolean return value. */
     public function createRRset($domainName, $rrsetData, &$createdRecordId = null) {
+        // Cloud DNS identifies an RRSet by name/type and each value by its RDATA.
         $createdRecordId = null;
-        if (empty($domainName)) {
-            throw new \Exception("Domain name cannot be empty");
+        if (!isset($rrsetData['subname'], $rrsetData['type'], $rrsetData['ttl']) || empty($rrsetData['records'])) {
+            throw new \InvalidArgumentException('Missing data for creating RRset.');
         }
-
-        if (
-            empty($rrsetData['type']) ||
-            !isset($rrsetData['subname'], $rrsetData['ttl'], $rrsetData['records']) ||
-            empty($rrsetData['records'])
-        ) {
-            throw new \Exception("Missing data for creating RRset");
+        $ttl = $this->ttl($rrsetData['ttl']);
+        $records = [];
+        foreach ($rrsetData['records'] as $value) {
+            $records[] = ['value' => $this->recordValue($rrsetData['type'], $value, $rrsetData)];
         }
-
-        try {
-            $result = getZoneId($this->pdo, $domainName);
-            $zoneId = $result['zoneId'];
-        } catch (\PDOException $e) {
-            throw new \Exception("Error fetching zoneId: " . $e->getMessage());
-        }
-
-        $type    = strtoupper($rrsetData['type']);
-        $ttl     = (int)$rrsetData['ttl'];
-        $value   = (string)$rrsetData['records'][0];
-        $subname = $rrsetData['subname'];
-
-        $apiName = ($subname === '' || $subname === '@') ? '@' : $subname;
-
-        $payload = [
-            'value'   => $value,
-            'ttl'     => $ttl,
-            'type'    => $type,
-            'name'    => $apiName,
-            'zone_id' => $zoneId,
-        ];
-
-        if (in_array($type, ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
-            $payload['priority'] = (int)$rrsetData['priority'];
-        }
-
-        try {
-            $response = $this->client->request('POST', 'records', [
-                'headers' => $this->headers,
-                'json'    => $payload,
-            ]);
-
-            if ($response->getStatusCode() === 200) {
-                $body     = json_decode($response->getBody()->getContents(), true);
-                $createdRecordId = $body['record']['id'] ?? null;
-
-                return true;
-            }
-
-            return false;
-        } catch (RequestException $e) {
-            throw new \Exception('Request failed: ' . $e->getMessage());
-        } catch (\PDOException $e) {
-            throw new \Exception("Error updating recordId: " . $e->getMessage());
-        }
+        $path = $this->rrsetPath($domainName, $rrsetData['subname'], $rrsetData['type']);
+        // add_records creates a missing RRSet and preserves existing sibling values.
+        $this->waitForAction($this->request('POST', $path . '/actions/add_records', ['json' => [
+            'ttl' => $ttl,
+            'records' => $records,
+        ]]));
+        return true;
     }
 
     public function createBulkRRsets($domainName, $rrsetDataArray) {
@@ -180,59 +98,48 @@ class Hetzner implements DnsHostingProviderInterface {
     }
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
-        if (empty($domainName)) {
-            throw new \Exception("Domain name cannot be empty");
+        if (!isset($rrsetData['ttl']) || count($rrsetData['records'] ?? []) !== 1) {
+            throw new \InvalidArgumentException('A TTL and exactly one new record value are required.');
         }
-
-        if (
-            empty($type) ||
-            !isset($rrsetData['ttl'], $rrsetData['records']) ||
-            empty($rrsetData['records'])
-        ) {
-            throw new \Exception("Missing data for modifying RRset");
+        $ttl = $this->ttl($rrsetData['ttl']);
+        $path = $this->rrsetPath($domainName, $subname, $type);
+        $body = $this->request('GET', $path);
+        $rrset = $body['rrset'] ?? [];
+        $records = $rrset['records'] ?? [];
+        if (!$records) {
+            throw new \RuntimeException('Hetzner RRSet contains no records.');
         }
-
-        try {
-            $result  = getZoneId($this->pdo, $domainName);
-            $zoneId  = $result['zoneId'];
-            $recordId = $rrsetData['record_id'] ?? null;
-            if ($recordId === null || $recordId === '') {
-                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
+        $oldValue = $rrsetData['old_value'] ?? null;
+        if ($oldValue === null) {
+            if (count($records) !== 1) {
+                throw new \InvalidArgumentException('old_value is required when updating a multi-value Hetzner RRSet.');
             }
-        } catch (\PDOException $e) {
-            throw new \Exception("Error in operation: " . $e->getMessage());
+            $oldValue = $records[0]['value'];
         }
-
-        $type  = strtoupper($type);
-        $ttl   = (int)$rrsetData['ttl'];
-        $value = (string)$rrsetData['records'][0];
-
-        $apiName = ($subname === '' || $subname === '@') ? '@' : $subname;
-
-        $payload = [
-            'value'   => $value,
-            'ttl'     => $ttl,
-            'type'    => $type,
-            'name'    => $apiName,
-            'zone_id' => $zoneId,
-        ];
-
-        if (in_array($type, ['MX', 'SRV'], true) && isset($rrsetData['priority'])) {
-            $payload['priority'] = (int)$rrsetData['priority'];
+        $oldValue = $this->recordValue($type, $oldValue);
+        $newValue = $this->recordValue($type, $rrsetData['records'][0], $rrsetData);
+        $found = false;
+        foreach ($records as &$record) {
+            if ($this->recordValue($type, $record['value']) === $oldValue) {
+                $record['value'] = $newValue;
+                $found = true;
+            }
         }
-
-        try {
-            $response = $this->client->request('PUT', "records/{$recordId}", [
-                'headers' => $this->headers,
-                'json'    => $payload,
-            ]);
-
-            return $response->getStatusCode() === 200;
-        } catch (RequestException $e) {
-            throw new \Exception('Request failed: ' . $e->getMessage());
-        } catch (\PDOException $e) {
-            throw new \Exception("Error in operation: " . $e->getMessage());
+        unset($record);
+        if (!$found) {
+            throw new \RuntimeException('The old record value was not found in the Hetzner RRSet.');
         }
+        if (count(array_unique(array_column($records, 'value'))) !== count($records)) {
+            throw new \InvalidArgumentException('The new record value already exists in the Hetzner RRSet.');
+        }
+        if ($oldValue !== $newValue) {
+            // Preserve sibling values and comments when replacing the selected value.
+            $this->waitForAction($this->request('POST', $path . '/actions/set_records', ['json' => ['records' => $records]]));
+        }
+        if (($rrset['ttl'] ?? null) !== $ttl) {
+            $this->waitForAction($this->request('POST', $path . '/actions/change_ttl', ['json' => ['ttl' => $ttl]]));
+        }
+        return true;
     }
 
     public function modifyBulkRRsets($domainName, $rrsetDataArray) {
@@ -240,22 +147,15 @@ class Hetzner implements DnsHostingProviderInterface {
     }
 
     public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null) {
-        try {
-            $recordId = $persistedRecordId;
-            if ($recordId === null || $recordId === '') {
-                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
-            }
-
-            $response = $this->client->request('DELETE', "records/{$recordId}", [
-                'headers' => $this->headers,
-            ]);
-
-            return $response->getStatusCode() === 204;
-        } catch (RequestException $e) {
-            throw new \Exception('Request failed: ' . $e->getMessage());
-        } catch (\PDOException $e) {
-            throw new \Exception("Error in operation: " . $e->getMessage());
+        if ($value === null) {
+            throw new \InvalidArgumentException('A record value is required for deletion.');
         }
+        $path = $this->rrsetPath($domainName, $subname, $type);
+        // Removes only this value; Hetzner removes an empty RRSet automatically.
+        $this->waitForAction($this->request('POST', $path . '/actions/remove_records', ['json' => [
+            'records' => [['value' => $this->recordValue($type, $value)]],
+        ]]));
+        return true;
     }
 
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
@@ -280,5 +180,114 @@ class Hetzner implements DnsHostingProviderInterface {
     public function getDSRecords(string $domainName): array
     {
         throw new \Exception("Retrieving DS records is not supported by this DNS provider.");
+    }
+
+    private function request(string $method, string $path, array $options = []): array {
+        $options['headers'] = $this->headers;
+        $response = $this->client->request($method, $path, $options);
+        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($body)) {
+            throw new \RuntimeException('Invalid Hetzner API response.');
+        }
+        return $body;
+    }
+
+    private function waitForAction(array $body): void {
+        $action = $body['action'] ?? null;
+        $deadline = microtime(true) + 60;
+        while (is_array($action)) {
+            if (($action['status'] ?? null) === 'success') {
+                return;
+            }
+            if (($action['status'] ?? null) === 'error') {
+                throw new \RuntimeException('Hetzner action failed: ' . ($action['error']['message'] ?? 'unknown error'));
+            }
+            if (($action['status'] ?? null) !== 'running' || empty($action['id'])) {
+                break;
+            }
+            if (microtime(true) >= $deadline) {
+                throw new \RuntimeException('Timed out waiting for Hetzner action ' . $action['id']);
+            }
+            usleep(250000);
+            $body = $this->request('GET', 'zones/actions/' . rawurlencode((string)$action['id']));
+            $action = $body['action'] ?? null;
+        }
+        throw new \RuntimeException('Hetzner API did not return a valid action.');
+    }
+
+    private function domainName(string $domainName): string {
+        $domainName = strtolower(rtrim(trim($domainName), '.'));
+        if ($domainName === '' || !filter_var($domainName, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            throw new \InvalidArgumentException('A valid ASCII/punycode domain name is required.');
+        }
+        return $domainName;
+    }
+
+    private function zonePath(string $domainName): string {
+        // Address migrated zones by name; old DNS Console IDs are not Cloud IDs.
+        return 'zones/' . rawurlencode($this->domainName($domainName));
+    }
+
+    private function rrsetPath(string $domainName, string $subname, string $type): string {
+        $subname = strtolower(rtrim(trim($subname), '.'));
+        $subname = $subname === '' ? '@' : $subname;
+        $type = strtoupper($type);
+        if (!preg_match('/^[A-Z][A-Z0-9]*$/', $type)) {
+            throw new \InvalidArgumentException('Invalid record type.');
+        }
+        return $this->zonePath($domainName) . '/rrsets/' . rawurlencode($subname) . '/' . $type;
+    }
+
+    private function ttl($ttl): int {
+        $ttl = filter_var($ttl, FILTER_VALIDATE_INT);
+        if ($ttl === false || $ttl < 60 || $ttl > 2147483647) {
+            throw new \InvalidArgumentException('Hetzner TTL must be between 60 and 2147483647 seconds.');
+        }
+        return $ttl;
+    }
+
+    private function recordValue(string $type, string $value, array $data = []): string {
+        $type = strtoupper($type);
+        if ($type === 'TXT') {
+            $txt = new TXT();
+            if (str_starts_with($value, '"') && str_ends_with($value, '"')) {
+                $txt->fromText($value);
+            } else {
+                $txt->setText($value, true);
+            }
+            return $txt->toText() ?: '""';
+        }
+        $value = trim($value);
+        if ($type === 'MX') {
+            if (!preg_match('/^\d+\s+/', $value)) {
+                if (!isset($data['priority'])) {
+                    throw new \InvalidArgumentException('MX value must include its priority.');
+                }
+                $value = (int)$data['priority'] . ' ' . $value;
+            }
+            if (!preg_match('/^(\d+)\s+(\S+)$/', $value, $parts)) {
+                throw new \InvalidArgumentException('Invalid MX value.');
+            }
+            return (int)$parts[1] . ' ' . strtolower(rtrim($parts[2], '.')) . '.';
+        }
+        if ($type === 'SRV') {
+            if (!preg_match('/^\d+\s+\d+\s+\d+\s+/', $value)) {
+                if (!isset($data['priority'], $data['weight'], $data['port'])) {
+                    throw new \InvalidArgumentException('SRV requires priority, weight, port and target.');
+                }
+                $value = (int)$data['priority'] . ' ' . (int)$data['weight'] . ' ' . (int)$data['port'] . ' ' . $value;
+            }
+            if (!preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(\S+)$/', $value, $parts)) {
+                throw new \InvalidArgumentException('Invalid SRV value.');
+            }
+            return (int)$parts[1] . ' ' . (int)$parts[2] . ' ' . (int)$parts[3] . ' ' . strtolower(rtrim($parts[4], '.')) . '.';
+        }
+        if (in_array($type, ['CNAME', 'NS', 'PTR'], true)) {
+            return strtolower(rtrim($value, '.')) . '.';
+        }
+        if (in_array($type, ['A', 'AAAA'], true) && filter_var($value, FILTER_VALIDATE_IP)) {
+            return inet_ntop(inet_pton($value));
+        }
+        return $value;
     }
 }
