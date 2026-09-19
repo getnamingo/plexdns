@@ -87,7 +87,9 @@ class Cloudflare implements DnsHostingProviderInterface {
         }
     }
 
-    public function createRRset($domainName, $rrsetData) {
+    /** Optional $createdRecordId output preserves the boolean return value. */
+    public function createRRset($domainName, $rrsetData, &$createdRecordId = null) {
+        $createdRecordId = null;
         try {
             $zoneId = $this->zones->getZoneID($domainName);
             $priority = isset($rrsetData['priority']) ? (string) $rrsetData['priority'] : '';
@@ -107,7 +109,10 @@ class Cloudflare implements DnsHostingProviderInterface {
                 $priority
             );
 
-            return $result === true ? $this->dns->getBody()->result->id : false;
+            if ($result === true) {
+                $createdRecordId = $this->dns->getBody()->result->id;
+            }
+            return $result === true;
         } catch (\Cloudflare\API\Endpoints\EndpointException $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
         }

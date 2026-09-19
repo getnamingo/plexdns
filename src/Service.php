@@ -352,6 +352,8 @@ class Service
                     $data['record_type'],
                     $rrsetData
                 );
+            } elseif (in_array($data['provider'], ['Cloudflare', 'Vultr', 'Hetzner'], true)) {
+                $this->dnsProvider->createRRset($domainName, $rrsetData, $providerRecordId);
             } else {
                 $providerRecordId = $this->dnsProvider->createRRset($domainName, $rrsetData);
             }

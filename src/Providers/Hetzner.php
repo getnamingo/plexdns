@@ -101,7 +101,9 @@ class Hetzner implements DnsHostingProviderInterface {
         }
     }
 
-    public function createRRset($domainName, $rrsetData) {
+    /** Optional $createdRecordId output preserves the boolean return value. */
+    public function createRRset($domainName, $rrsetData, &$createdRecordId = null) {
+        $createdRecordId = null;
         if (empty($domainName)) {
             throw new \Exception("Domain name cannot be empty");
         }
@@ -148,9 +150,9 @@ class Hetzner implements DnsHostingProviderInterface {
 
             if ($response->getStatusCode() === 200) {
                 $body     = json_decode($response->getBody()->getContents(), true);
-                $recordId = $body['record']['id'] ?? null;
+                $createdRecordId = $body['record']['id'] ?? null;
 
-                return $recordId ?? true;
+                return true;
             }
 
             return false;
