@@ -134,7 +134,10 @@ class DNSimple implements DnsHostingProviderInterface {
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
+            $recordId = $rrsetData['record_id'] ?? null;
+            if ($recordId === null || $recordId === '') {
+                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $rrsetData);
+            }
 
             $record = [];
 
@@ -177,9 +180,12 @@ class DNSimple implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null) {
         try {
-            $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
+            $recordId = $persistedRecordId;
+            if ($recordId === null || $recordId === '') {
+                $recordId = getRecordId($this->pdo, $domainName, $type, $subname, $value);
+            }
 
             $this->client->zones->deleteRecord($this->account_id, $domainName, $recordId);
 

@@ -151,10 +151,10 @@ class AnycastDNS implements DnsHostingProviderInterface {
             ? (string) $rrsetData['old_value']
             : $content;
 
-        $all = $this->request('GET', "dns/{$domainName}");
+        $recordId = $rrsetData['record_id'] ?? null;
+        $recordId = $recordId === '' ? null : $recordId;
+        $all = $recordId === null ? $this->request('GET', "dns/{$domainName}") : [];
         $records = isset($all['records']) ? $all['records'] : $all;
-
-        $recordId = null;
 
         foreach ($records as $rec) {
             $recName = isset($rec['name']) ? $rec['name'] : '';
@@ -195,7 +195,7 @@ class AnycastDNS implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value)
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null)
     {
         if (empty($domainName) || empty($type) || empty($value)) {
             throw new Exception("Missing data for deleting RRset");
@@ -203,10 +203,10 @@ class AnycastDNS implements DnsHostingProviderInterface {
 
         $name = trim((string)$subname) === '' ? '@' : $subname;
 
-        $all = $this->request('GET', "dns/{$domainName}");
+        $recordId = $persistedRecordId;
+        $recordId = $recordId === '' ? null : $recordId;
+        $all = $recordId === null ? $this->request('GET', "dns/{$domainName}") : [];
         $records = isset($all['records']) ? $all['records'] : $all;
-
-        $recordId = null;
 
         foreach ($records as $rec) {
 

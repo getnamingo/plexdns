@@ -63,7 +63,9 @@ class Vultr implements DnsHostingProviderInterface {
         }
     }
 
-    public function createRRset($domainName, $rrsetData) {
+    /** Optional $createdRecordId output preserves the boolean return value. */
+    public function createRRset($domainName, $rrsetData, &$createdRecordId = null) {
+        $createdRecordId = null;
         try {
             $record = new Record();
 
@@ -87,6 +89,7 @@ class Vultr implements DnsHostingProviderInterface {
 
             $response = $this->client->dns->createRecord($domainName, $record);
 
+            $createdRecordId = $response->getId();
             return true;
         } catch (\Exception $e) {
             throw new \Exception("Error creating record: " . $e->getMessage());
@@ -119,8 +122,9 @@ class Vultr implements DnsHostingProviderInterface {
                 throw new \Exception("No value provided to locate record.");
             }
 
-            $records  = $this->client->dns->getRecords($domainName);
-            $recordId = null;
+            $recordId = $rrsetData['record_id'] ?? null;
+            $recordId = $recordId === '' ? null : $recordId;
+            $records = $recordId === null ? $this->client->dns->getRecords($domainName) : [];
 
             foreach ($records as $record) {
                 if (!$record instanceof Record) {
@@ -178,10 +182,11 @@ class Vultr implements DnsHostingProviderInterface {
         throw new \Exception("Not yet implemented");
     }
 
-    public function deleteRRset($domainName, $subname, $type, $value) {
+    public function deleteRRset($domainName, $subname, $type, $value, $persistedRecordId = null) {
         try {
-            $records = $this->client->dns->getRecords($domainName);
-            $recordId = null;
+            $recordId = $persistedRecordId;
+            $recordId = $recordId === '' ? null : $recordId;
+            $records = $recordId === null ? $this->client->dns->getRecords($domainName) : [];
 
             foreach ($records as $record) {
                 if ($record instanceof \Vultr\VultrPhp\Services\DNS\Record) {

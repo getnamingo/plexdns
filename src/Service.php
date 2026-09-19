@@ -352,6 +352,8 @@ class Service
                     $data['record_type'],
                     $rrsetData
                 );
+            } elseif (in_array($data['provider'], ['Cloudflare', 'Vultr', 'Hetzner'], true)) {
+                $this->dnsProvider->createRRset($domainName, $rrsetData, $providerRecordId);
             } else {
                 $providerRecordId = $this->dnsProvider->createRRset($domainName, $rrsetData);
             }
@@ -377,7 +379,7 @@ class Service
             ':updated_at' => date('Y-m-d H:i:s'),
             ':record_id' => (!is_bool($providerRecordId) && $providerRecordId !== null)
                 ? (string)$providerRecordId
-                : uniqid(),
+                : null,
         ];
 
         try {
@@ -424,6 +426,10 @@ class Service
             throw new \RuntimeException("Record does not exist.");
         }
         $providerRecordId = $record[0]['recordId'];
+        // Older versions stored uniqid() placeholders when the provider returned no ID.
+        if (preg_match('/^[0-9a-f]{13}$/i', (string)$providerRecordId)) {
+            $providerRecordId = null;
+        }
 
         // Set up the DNS provider
         $this->chooseDnsProvider($data);
@@ -593,6 +599,10 @@ class Service
             throw new \RuntimeException("Record does not exist.");
         }
         $providerRecordId = $record[0]['recordId'];
+        // Older versions stored uniqid() placeholders when the provider returned no ID.
+        if (preg_match('/^[0-9a-f]{13}$/i', (string)$providerRecordId)) {
+            $providerRecordId = null;
+        }
 
         // Set up the DNS provider
         $this->chooseDnsProvider($data);
@@ -659,7 +669,7 @@ class Service
             // Default behaviour: delete whole RRset for non-deSEC or non-multi types
             try {
                 if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                    if ($data['provider'] === 'Bunny') {
+                    if (in_array($data['provider'], ['Bunny', 'AnycastDNS', 'Cloudflare', 'ClouDNS', 'DNSimple', 'Hetzner', 'Vultr'], true)) {
                         $this->dnsProvider->deleteRRset(
                             $domainName,
                             $host,
