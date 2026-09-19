@@ -185,8 +185,6 @@ try {
         $ds = $service->enableDNSSEC($config);
         print_r($ds);
 
-        // New Cloudflare/DNSimple/Vultr DS entries: key_tag, algorithm, digest_type, digest.
-        // Older providers retain their own formats (some return DS strings).
         // Publish DS at your registrar if needed; DNSimple handles its registered domains.
         // Empty DS can mean keys are pending: retrieve them again later.
         echo "Getting DNSSEC status...\n";

@@ -47,11 +47,6 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
 
-Hetzner's ✅ covers zone creation/deletion and record creation/update/deletion.
-Listing, export, bulk operations, synchronization and DNSSEC remain unsupported.
-Use a read/write token for the Hetzner Console project containing the zones;
-legacy DNS Console tokens do not work.
-
 ### Testing Provider
 
 `PlexDNS\Providers\Testing` lets projects exercise `PlexDNS\Service` without
