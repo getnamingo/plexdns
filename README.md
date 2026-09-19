@@ -2,7 +2,7 @@
 
 PlexDNS is a **unified, multi-provider DNS management tool** that allows users to manage DNS zones and records across multiple DNS hosting providers using a common interface.
 
-## 🚀 Installation
+## Installation
 
 1. **Go to your project directory** and install PlexDNS via **Composer**:
 
@@ -30,14 +30,14 @@ cp vendor/namingo/plexdns/demo.php .
 
 - Listing available DNS providers
 
-## 🌍 Supported Providers
+## Supported Providers
 
 Most DNS providers **require an API key**, while some may need **additional settings** such as authentication credentials or specific server configurations. All required values must be set in the `.env` file.
 
 | Provider    | Credentials in .env | Requirements  | Status | DNSSEC |
 |------------|---------------------|------------|---------------------|---------------------|
 | **AnycastDNS** | `API_KEY` | | ✅ | ❌ |
-| **Bind9** | `API_KEY:BIND_IP` | [bind9-api-server](https://github.com/getnamingo/bind9-api-server)/[bind9-api-server-sqlite](https://github.com/getnamingo/bind9-api-server-sqlite) | ✅ | 🚧 |
+| **Bind9** | `API_KEY:BIND_IP` | [bind9-api](https://github.com/getnamingo/bind9-api) | ✅ | 🚧 |
 | **Bunny** | `API_KEY` | | ✅ | ✅ |
 | **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ | ✅ |
 | **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ | ✅ |
@@ -46,45 +46,6 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Hetzner** | `API_KEY` | Hetzner Console project token (read/write) | 🚧 | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
-
-### DNSSEC
-
-[Cloudflare](https://developers.cloudflare.com/api/resources/dns/subresources/dnssec/),
-[DNSimple](https://developer.dnsimple.com/v2/domains/dnssec/) and
-[Vultr](https://github.com/vultr/govultr/blob/master/domain.go) support `enableDNSSEC()`, `disableDNSSEC()`,
-`getDNSSECStatus()` and `getDSRecords()`. Enabling returns DS records; disabling
-returns a boolean. Their DS entries contain `key_tag`, `algorithm`, `digest_type`
-and `digest`. Status includes `enabled`, `ds` and provider details in `raw`.
-Cloudflare also exposes `status`; `pending` counts as enabled signing, but the
-parent DS is not yet validated. Re-query if keys are still being generated.
-
-Publish the returned DS at the registrar when required, and remove the parent DS
-before disabling signing. DNSimple also manages DS publication for domains
-registered with DNSimple. Existing providers retain their current return formats.
-
-AnycastDNS and Hetzner remain unsupported for DNSSEC management: their published
-APIs ([AnycastDNS](https://api.anycastdns.app/),
-[Hetzner](https://docs.hetzner.cloud/reference/cloud#zones)) expose no zone-signing controls. Hosting a DS record for a child zone is a
-separate operation. BIND9 DNSSEC is unchanged.
-
-### Hetzner
-
-The provider uses the [Hetzner Cloud DNS API](https://docs.hetzner.cloud/reference/cloud#zones).
-Set `apikey` / `API_KEY` to a **read/write API token from the Hetzner Console project
-containing your zones**. Old DNS Console tokens do not work with this API.
-Existing zones must be available in that project; the provider addresses them by name
-and ignores old DNS Console zone/record IDs.
-
-Zone and record creation, update and deletion are supported. Other previously
-unimplemented operations (including synchronization and DNSSEC) remain unsupported.
-`createRRset()` still returns a boolean. Its optional ID output is null because the
-Cloud API identifies individual records by their value within a name/type RRSet.
-
-`Service` supplies the saved old value for updates/deletes, including MX/SRV priority.
-Direct provider callers must supply complete RDATA for MX/SRV deletion and `old_value`
-when updating a multi-value RRSet. TXT values are quoted/chunked automatically.
-TTL is shared by all values in an RRSet; adding another value requires the existing
-TTL. Mutations wait for Hetzner's action to succeed before Service changes local data.
 
 ### Testing Provider
 
@@ -144,10 +105,10 @@ $config = [
 We extend our gratitude to:
 - [QCloudns API Client](https://github.com/sussdorf/qcloudns) which served as inspiration for our ClouDNS module.
 
-## 📄 License
+## License
 PlexDNS is licensed under the **MIT License**.
 
-## 📩 Contributing
+## Contributing
 We welcome contributions! Feel free to submit **issues** or **pull requests** to improve the project.
 
 1. Fork the repository.
@@ -155,5 +116,5 @@ We welcome contributions! Feel free to submit **issues** or **pull requests** to
 3. Make your changes and commit them.
 4. Submit a pull request.
 
-## 📞 Support
+## Support
 For any issues, please open an issue on GitHub or contact us at **help@namingo.org**.
