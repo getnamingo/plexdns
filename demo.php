@@ -7,7 +7,7 @@ use PlexDNS\Service;
 // define('PLEX_TABLE_ZONES', 'plexdns_zones');
 // define('PLEX_TABLE_RECORDS', 'plexdns_records');
 
-require_once 'vendor/autoload.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 function getProviderCredentials(string $provider): ?array {
     // Convert provider name to uppercase (matches env variables)
@@ -54,7 +54,9 @@ function getActiveProviders(): array {
 function getProviderDisplayName(string $provider): string {
     $providerNames = [
         'ANYCASTDNS'  => 'AnycastDNS',
+        'BIND'        => 'Bind',
         'BIND9'       => 'Bind',
+        'BUNNY'       => 'Bunny',
         'CLOUDFLARE'  => 'Cloudflare',
         'CLOUDNS'     => 'ClouDNS',
         'DESEC'       => 'Desec',
@@ -71,8 +73,13 @@ function getProviderDisplayName(string $provider): string {
 $dotenv = Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
-// Get provider
-$provider = 'Desec' ?? null;
+// Demo creates/deletes a zone and uninstalls its tables: use a test zone/database.
+// Set PROVIDER in .env, or change the default below. Names match DNS_<PROVIDER>_*.
+// Examples: Hetzner, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
+$provider = $_ENV['PROVIDER'] ?? 'Desec';
+$domainName = 'example.com'; // Replace with your test domain.
+$runDnssec = true;          // Skipped for providers without implemented DNSSEC.
+$disableDnssec = false;     // Optional example; remove any parent DS before disabling.
 
 if (!$provider) {
     die("Error: Missing required environment variables in .env file (PROVIDER)\n");
@@ -88,11 +95,34 @@ try {
     $cloudnsAuthId = $credentials['AUTH_ID'] ?? null;
     $cloudnsAuthPassword = $credentials['AUTH_PASSWORD'] ?? null;
 
-    if (!$apiKey) {
+    // Cloudflare: API_KEY can be a token (leave EMAIL empty) or email:global_key.
+    // For a separate global key, set both EMAIL and API_KEY.
+    if ($providerDisplay === 'Cloudflare' && !empty($credentials['EMAIL']) && $apiKey && !str_contains($apiKey, ':')) {
+        $apiKey = $credentials['EMAIL'] . ':' . $apiKey;
+    }
+    if ($providerDisplay === 'ClouDNS') {
+        if (!$cloudnsAuthId || !$cloudnsAuthPassword) {
+            throw new Exception('ClouDNS requires AUTH_ID and AUTH_PASSWORD.');
+        }
+    } elseif (!$apiKey) {
         throw new Exception("Missing API Key for provider: $provider");
     }
+
+    // Reuse the same credentials/options for zone, record and DNSSEC operations.
+    // Hetzner: API_KEY must be a read/write Console project token, not a legacy DNS token.
+    // Bind: API_KEY is username:password; BIND_IP is the API server address.
+    $config = [
+        'provider' => $providerDisplay,
+        'domain_name' => $domainName,
+        'apikey' => $apiKey,
+        'bindip' => $bindip,
+        'powerdnsip' => $powerdnsip,
+        'cloudns_auth_id' => $cloudnsAuthId,
+        'cloudns_auth_password' => $cloudnsAuthPassword,
+        // Optional PowerDNS/BIND secondary server options go here (see README).
+    ];
 } catch (Exception $e) {
-    echo "Error: " . $e->getMessage();
+    die("Error: " . $e->getMessage() . "\n");
 }
 
 // Database configuration
@@ -143,91 +173,86 @@ try {
     echo "Creating a domain...\n";
     $domainOrder = [
         'client_id' => 1,
-        'config' => json_encode(['domain_name' => 'example.com', 'provider' => $providerDisplay, 'apikey' => $apiKey]),
+        'config' => json_encode($config),
     ];
     $domain = $service->createDomain($domainOrder);
     print_r($domain);
 
-    // Step 2b: DNSSEC operations
-    $dnssecConfig = [
-        'provider'    => $providerDisplay,
-        'domain_name' => 'example.com',
-        'apikey'      => $apiKey,
-        // add provider-specific fields here if needed:
-        // 'powerdnsip'           => $powerdnsip,
-        // 'cloudns_auth_id'      => $cloudnsAuthId,
-        // 'cloudns_auth_password'=> $cloudnsAuthPassword,
-    ];
+    // Step 2b: DNSSEC operations (Cloudflare, DNSimple and Vultr are now supported).
+    $dnssecProviders = ['Bunny', 'ClouDNS', 'Desec', 'PowerDNS', 'Cloudflare', 'DNSimple', 'Vultr'];
+    if ($runDnssec && in_array($providerDisplay, $dnssecProviders, true)) {
+        echo "Enabling DNSSEC...\n";
+        $ds = $service->enableDNSSEC($config);
+        print_r($ds);
 
-    echo "Enabling DNSSEC...\n";
-    $ds = $service->enableDNSSEC($dnssecConfig);
-    echo "DS records after enable:\n";
-    print_r($ds);
+        // New Cloudflare/DNSimple/Vultr DS entries: key_tag, algorithm, digest_type, digest.
+        // Older providers retain their own formats (some return DS strings).
+        // Publish DS at your registrar if needed; DNSimple handles its registered domains.
+        // Empty DS can mean keys are pending: retrieve them again later.
+        echo "Getting DNSSEC status...\n";
+        $status = $service->getDNSSECStatus($config);
+        print_r($status);
+        // Cloudflare status 'pending' means signing enabled, parent DS not yet validated.
 
-    echo "Getting DNSSEC status...\n";
-    $status = $service->getDNSSECStatus($dnssecConfig);
-    print_r($status);
+        echo "Getting DS records only...\n";
+        $dsOnly = $service->getDSRecords($config);
+        print_r($dsOnly);
 
-    echo "Getting DS records only...\n";
-    $dsOnly = $service->getDSRecords($dnssecConfig);
-    print_r($dsOnly);
-
-    // Optional: disable DNSSEC if the provider supports it
-    echo "Disabling DNSSEC (if supported)...\n";
-    try {
-        $service->disableDNSSEC($dnssecConfig);
-        echo "DNSSEC disabled.\n";
-    } catch (Exception $e) {
-        echo "Disable DNSSEC not supported: " . $e->getMessage() . "\n";
+        if ($disableDnssec && $providerDisplay !== 'Desec') {
+            // Remove the parent DS and allow caches to expire before stopping signing.
+            echo $service->disableDNSSEC($config)
+                ? "DNSSEC disable request accepted.\n"
+                : "DNSSEC was not disabled.\n";
+        }
+        // deSEC always signs; disabling DNSSEC there is not supported.
+    } elseif ($runDnssec) {
+        echo "Skipping DNSSEC: not implemented for $providerDisplay.\n";
     }
 
     // Step 3: Add a DNS record
     echo "Adding a DNS record...\n";
-    $recordData = [
-        'domain_name' => 'example.com',
+    $recordData = $config + [
         'record_name' => 'www',
         'record_type' => 'A',
-        'record_value' => '192.168.1.1',
+        'record_value' => '192.0.2.1',
         'record_ttl' => 3600,
-        'record_priority' => 10, // Optional
-        'provider' => $providerDisplay,
-        'apikey' => $apiKey
+        // 'record_priority' => 10, // Required for MX/SRV, not A/AAAA/TXT.
+        // 'record_weight' => 20, 'record_port' => 5060, // Required for SRV.
     ];
+    // addRecord() returns the LOCAL database ID. Use it for updateRecord()/delRecord().
+    // Service saves/uses the provider recordId when available; no provider ID is required.
+    // Hetzner uses name/type/value; Service supplies the saved old value automatically.
+    // Direct Cloudflare/Vultr/Hetzner createRRset() calls still return bool;
+    // their optional third argument receives the provider ID (null for Hetzner).
     $recordId = $service->addRecord($recordData);
     echo "DNS record added successfully.\n";
 
     // Step 4: Update a DNS record
     echo "Updating a DNS record...\n";
-    $updateData = [
-        'domain_name' => 'example.com',
+    $updateData = $config + [
         'record_id' => $recordId,
         'record_name' => 'www',
         'record_type' => 'A',
-        'record_value' => '192.168.1.2',
+        'record_value' => '192.0.2.2',
         'record_ttl' => 7200,
-        'provider' => $providerDisplay,
-        'apikey' => $apiKey
     ];
     $service->updateRecord($updateData);
     echo "DNS record updated successfully.\n";
 
-     // Step 5: Delete a DNS record
+    // Step 5: Delete a DNS record
     echo "Deleting a DNS record...\n";
-    $deleteData = [
-        'domain_name' => 'example.com',
+    $deleteData = $config + [
         'record_id' => $recordId,
         'record_name' => 'www',
         'record_type' => 'A',
-        'record_value' => '192.168.1.2',
-        'provider' => $providerDisplay,
-        'apikey' => $apiKey
+        'record_value' => '192.0.2.2',
     ];
     $service->delRecord($deleteData);
     echo "DNS record deleted successfully.\n";
 
     // Step 6: Delete a domain
     echo "Deleting a domain...\n";
-    $service->deleteDomain(['config' => json_encode(['domain_name' => 'example.com', 'provider' => $providerDisplay, 'apikey' => $apiKey])]);
+    $service->deleteDomain(['config' => json_encode($config)]);
     echo "Domain deleted successfully.\n";
 
     // Step 7: Uninstall database structure
