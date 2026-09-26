@@ -761,6 +761,66 @@ class Service
     }
 
     /**
+     * Return DNSSEC capabilities for a provider.
+     *
+     * @return array{
+     *     supported: bool,
+     *     can_enable: bool,
+     *     can_disable: bool,
+     *     enforced: bool
+     * }
+     */
+    public function getDNSSECCapabilities(array $config): array
+    {
+        $provider = $config['provider'] ?? null;
+
+        if (!$provider) {
+            throw new \RuntimeException('Missing provider for DNSSEC capability check.');
+        }
+
+        return match ($provider) {
+            'Bunny',
+            'Cloudflare',
+            'ClouDNS',
+            'DNSimple',
+            'PowerDNS',
+            'Vultr',
+            'Testing' => [
+                'supported' => true,
+                'can_enable' => true,
+                'can_disable' => true,
+                'enforced' => false,
+            ],
+
+            'Desec' => [
+                'supported' => true,
+                'can_enable' => false,
+                'can_disable' => false,
+                'enforced' => true,
+            ],
+
+            'AnycastDNS',
+            'Bind',
+            'Hetzner' => [
+                'supported' => false,
+                'can_enable' => false,
+                'can_disable' => false,
+                'enforced' => false,
+            ],
+
+            default => throw new \RuntimeException("Unknown DNS provider: {$provider}"),
+        };
+    }
+
+    /**
+     * Whether this provider supports DNSSEC.
+     */
+    public function supportsDNSSEC(array $config): bool
+    {
+        return $this->getDNSSECCapabilities($config)['supported'];
+    }
+
+    /**
      * Enable DNSSEC at the provider and return DS records.
      *
      * @param array $config Must contain at least: provider, domain_name and provider auth data.
