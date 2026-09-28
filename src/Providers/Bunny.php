@@ -529,7 +529,7 @@ class Bunny implements DnsHostingProviderInterface
         try {
             $zoneId = $this->resolveZoneId($domainName);
             $resp = $this->request('POST', '/dnszone/' . $zoneId . '/dnssec');
-            return is_array($resp) ? $resp : ['result' => $resp];
+            return is_array($resp) ? $this->dnssecRecords($resp) : [];
         } catch (\Throwable $e) {
             throw new \Exception("Error enabling DNSSEC: " . $e->getMessage());
         }
@@ -572,11 +572,50 @@ class Bunny implements DnsHostingProviderInterface
     {
         $status = $this->getDNSSECStatus($domainName);
 
-        if (empty($status['ds'])) {
+        if (empty($status['enabled'])) {
             return [];
         }
 
-        return is_array($status['ds']) ? $status['ds'] : [$status['ds']];
+        $zoneId = $this->resolveZoneId($this->normalizeDomain($domainName));
+        $resp = $this->request('POST', '/dnszone/' . $zoneId . '/dnssec');
+
+        return is_array($resp) ? $this->dnssecRecords($resp) : [];
+    }
+
+    private function dnssecRecords(array $data): array
+    {
+        if (
+            isset($data['KeyTag'], $data['Algorithm'], $data['DigestType'], $data['Digest'])
+            && is_numeric($data['KeyTag'])
+            && is_numeric($data['Algorithm'])
+            && is_numeric($data['DigestType'])
+            && preg_match('/^[a-f0-9]+$/i', (string)$data['Digest'])
+        ) {
+            return [[
+                'key_tag' => (int)$data['KeyTag'],
+                'algorithm' => (int)$data['Algorithm'],
+                'digest_type' => (int)$data['DigestType'],
+                'digest' => (string)$data['Digest'],
+            ]];
+        }
+
+        if (
+            !empty($data['DsRecord'])
+            && preg_match(
+                '/\bDS\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-f0-9]+)/i',
+                (string)$data['DsRecord'],
+                $matches
+            )
+        ) {
+            return [[
+                'key_tag' => (int)$matches[1],
+                'algorithm' => (int)$matches[2],
+                'digest_type' => (int)$matches[3],
+                'digest' => $matches[4],
+            ]];
+        }
+
+        return [];
     }
 
     /* ---------------------------
