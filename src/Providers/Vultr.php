@@ -264,7 +264,7 @@ class Vultr implements DnsHostingProviderInterface {
         $records = [];
         foreach ($this->client->dns->getDNSSecInfo($domainName) as $record) {
             // This endpoint returns both DNSKEY and DS zone-file records.
-            if (preg_match('/\sIN\s+DS\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-f0-9]+)\s*$/i', $record, $matches)) {
+            if (preg_match('/\sIN\s+DS\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-f0-9]+)(?:\s*;.*)?\s*$/i', $record, $matches)) {
                 $records[] = [
                     'key_tag' => (int)$matches[1],
                     'algorithm' => (int)$matches[2],

@@ -115,8 +115,8 @@ $p = provider(DNSimple::class, [response(['message' => 'DNSSEC is not enabled'],
 fails(fn() => $p->disableDNSSEC('example.com'));
 
 $vultrRecords = ['example.com IN DNSKEY 257 3 13 dGVzdA==',
-    'example.com IN DS 27933 13 1 ' . str_repeat('cd', 20),
-    'example.com. 3600 IN DS 27933 13 2 ' . $ds['digest']];
+    'example.com IN DS 27933 13 1 ' . str_repeat('cd', 20) . ' ; ( SHA1 digest )',
+    'example.com. 3600 IN DS 27933 13 2 ' . $ds['digest'] . ' ; ( SHA256 digest )'];
 $vultrDs = [array_replace($ds, ['digest_type' => 1, 'digest' => str_repeat('cd', 20)]), $ds];
 $history = [];
 $p = provider(Vultr::class, [new Response(204), response(['dns_sec' => $vultrRecords])], $history);
