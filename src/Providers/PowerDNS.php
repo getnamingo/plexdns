@@ -74,6 +74,7 @@ class PowerDNS implements DnsHostingProviderInterface {
     private $nsRecords;
     private $slaveClients = [];
     private $masterIp;
+    private $soaEmail;
 
     public function __construct($config) {
         $token = $config['apikey'];
@@ -92,6 +93,8 @@ class PowerDNS implements DnsHostingProviderInterface {
                 $this->nsRecords[$key] = $config[$key];
             }
         }
+
+        $this->soaEmail = trim((string)($config['soa_email'] ?? $config['soaemail'] ?? ''));
 
         $this->client = new PowerdnsApi($api_ip, $token);
 
@@ -130,6 +133,8 @@ class PowerDNS implements DnsHostingProviderInterface {
             $newZone->setNameservers($formattedNsRecords);
             $this->client->createZoneFromResource($newZone);
 
+            $this->updateSoa($domainName);
+
             if (!empty($this->masterIp)) {
                 foreach ($this->slaveClients as $slaveClient) {
                     $newZone = new ZoneResource();
@@ -150,6 +155,69 @@ class PowerDNS implements DnsHostingProviderInterface {
                 "Failed to create zone for domain: " . $domainName . ". Error: " . $e->getMessage()
             );
         }
+    }
+
+    private function updateSoa(string $domainName): void
+    {
+        if (empty($this->nsRecords['ns1']) || $this->soaEmail === '') {
+            return;
+        }
+
+        $zone = $this->client->zone($domainName);
+
+        foreach ($zone->get() as $rrset) {
+            if ($rrset->getType() !== RecordType::SOA) {
+                continue;
+            }
+
+            $records = $rrset->getRecords();
+            if (empty($records)) {
+                return;
+            }
+
+            $content = trim($records[0]->getContent());
+            $parts = preg_split('/\s+/', $content);
+
+            if (count($parts) < 7) {
+                return;
+            }
+
+            // Keep PowerDNS serial/refresh/retry/expire/minimum values.
+            $parts[0] = rtrim($this->nsRecords['ns1'], '.') . '.';
+            $parts[1] = $this->soaEmailToRname($this->soaEmail);
+
+            $name = $rrset->getName();
+            $ttl = $rrset->getTtl() ?? 3600;
+
+            $rrset->delete();
+
+            $newSoa = new ResourceRecord();
+            $newSoa->setName($name);
+            $newSoa->setType(RecordType::SOA);
+            $newSoa->setTtl($ttl);
+
+            $record = new Record();
+            $record->setContent(implode(' ', $parts));
+            $newSoa->addRecord($record);
+
+            $zone->create($newSoa);
+            return;
+        }
+    }
+
+    private function soaEmailToRname(string $email): string
+    {
+        if (!str_contains($email, '@')) {
+            return rtrim($email, '.') . '.';
+        }
+
+        [$local, $domain] = explode('@', $email, 2);
+
+        // Dots in the mailbox local part must be escaped in SOA RNAME.
+        $local = str_replace('\\', '\\\\', $local);
+        $local = str_replace('.', '\\.', $local);
+
+        return $local . '.' . rtrim($domain, '.') . '.';
     }
 
     public function listDomains() {
