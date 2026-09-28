@@ -296,8 +296,12 @@ class ClouDNS implements DnsHostingProviderInterface {
                 'domain-name' => $domainName,
             ]);
         } catch (Exception $e) {
-            // If DNSSEC is not active, ClouDNS returns statusDescription "dnssec_not_active"
-            if (strpos($e->getMessage(), 'dnssec_not_active') !== false) {
+            // DNSSEC not being enabled is a normal state for a new zone.
+            $message = $e->getMessage();
+            if (
+                stripos($message, 'dnssec_not_active') !== false ||
+                stripos($message, 'DNSSEC is not active') !== false
+            ) {
                 return [];
             }
             throw $e;
