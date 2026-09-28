@@ -44,7 +44,7 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Desec** | `API_KEY` | | ✅ | ✅ |
 | **DNSimple** | `API_KEY` | Account access token | ✅ | ✅ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token | ✅ | ❌ |
-| **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
+| **PowerDNS** | `API_KEY:POWERDNS_IP` | [installer](bin/install-powerdns-ubuntu-26.04.sh) | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
 
 ### Testing Provider
