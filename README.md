@@ -42,7 +42,7 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Cloudflare** | `EMAIL:API_KEY` or `API_TOKEN` | | ✅ | ✅ |
 | **ClouDNS** | `AUTH_ID:AUTH_PASSWORD` | | ✅ | ✅ |
 | **Desec** | `API_KEY` | | ✅ | ✅ |
-| **DNSimple** | `API_KEY` | | ✅ | ✅ |
+| **DNSimple** | `API_KEY` | Account access token | ✅ | ✅ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token (read/write) | ✅ | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | gmysql-dnssec=yes in pdns.conf | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
