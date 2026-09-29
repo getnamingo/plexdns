@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use PDO;
 
 /**
- * Contract for DNS hosting providers used by PlexDNS.
+ * Contract for DNS hosting providers used by Namingo\Cardo\DNS.
  *
  * Implementations SHOULD:
  *  - Throw exceptions on transport/provider failures (do not silently return null/false).
