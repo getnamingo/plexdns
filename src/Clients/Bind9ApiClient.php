@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Clients;
+namespace Namingo\Cardo\DNS\Clients;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
