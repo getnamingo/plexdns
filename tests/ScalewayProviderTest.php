@@ -65,7 +65,7 @@ expect(payload($history, 2) === [
 
 // Zone export is BIND format.
 $history = [];
-$p = provider([response(['content' => '$ORIGIN example.com.\n@ 3600 IN A 192.0.2.1\n'])], $history);
+$p = provider([new Response(200, ['Content-Type' => 'text/plain'], "$ORIGIN example.com.\n@ 3600 IN A 192.0.2.1\n")], $history);
 expect(str_contains($p->exportDomainAsZonefile('example.com'), '192.0.2.1'), 'Zone export.');
 expect($history[0]['request']->getUri()->getQuery() === 'format=bind', 'BIND export format.');
 
