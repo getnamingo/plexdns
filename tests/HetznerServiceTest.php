@@ -31,12 +31,12 @@ final class HetznerServiceFake {
         return true;
     }
 }
-class_alias(HetznerServiceFake::class, 'PlexDNS\\Providers\\Hetzner');
+class_alias(HetznerServiceFake::class, 'Namingo\Cardo\DNS\\Providers\\Hetzner');
 function expect(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);
 }
 $db = new PDO('sqlite::memory:');
-$service = new PlexDNS\Service($db);
+$service = new Namingo\Cardo\DNS\Service($db);
 $service->install();
 $order = ['client_id' => 1, 'config' => json_encode(['provider' => 'Hetzner', 'domain_name' => 'example.com', 'apikey' => 'test'])];
 $service->createDomain($order);
