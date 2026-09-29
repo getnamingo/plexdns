@@ -41,6 +41,8 @@
         "test": [
             "php tests/CompatibilityTest.php",
             "php tests/TestingProviderTest.php",
+            "php tests/ServiceStateTest.php",
+            "php tests/BindServiceTest.php",
             "php tests/HetznerProviderTest.php",
             "php tests/HetznerServiceTest.php",
             "php tests/DigitalOceanProviderTest.php",
