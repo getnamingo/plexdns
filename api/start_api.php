@@ -258,12 +258,12 @@ $server->on('request', function (Request $request, Response $response) use ($api
     } catch (InvalidArgumentException $e) {
         cardoApiRespond($response, 400, ['error' => $e->getMessage()]);
     } catch (RuntimeException $e) {
-        $log->warning('API operation failed.', [
+        $log->error('API operation failed.', [
             'request_id' => $requestId,
             'path' => $path,
             'error' => $e->getMessage(),
         ]);
-        cardoApiRespond($response, 400, ['error' => $e->getMessage()]);
+        cardoApiRespond($response, 502, ['error' => 'Upstream operation failed', 'request_id' => $requestId]);
     } catch (Throwable $e) {
         $log->error('Unhandled API error.', [
             'request_id' => $requestId,
