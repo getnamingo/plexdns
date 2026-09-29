@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use Cloudflare\API\Auth\APIKey as CloudflareAPIKey;
 use Cloudflare\API\Auth\APIToken as CloudflareAPIToken;
@@ -138,7 +138,7 @@ class Cloudflare implements DnsHostingProviderInterface {
     }
 
     public function sync(\PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('Cloudflare synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('Cloudflare synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {
