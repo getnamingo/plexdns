@@ -436,8 +436,18 @@ class PowerDNS implements DnsHostingProviderInterface {
             $prio = (int)$rrsetData['priority'];
             $new  = $prio . ' ' . $new . '.';
         } elseif ($type === 'SRV') {
+            $oldData = $rrsetData;
+            if (array_key_exists('old_priority', $rrsetData)) {
+                $oldData['priority'] = (int)$rrsetData['old_priority'];
+            }
+            if ($old !== '') {
+                $old = RecordValue::content($type, $old, $oldData, true);
+            }
             $new = RecordValue::content($type, $new, $rrsetData, true);
         } elseif ($type === 'CAA') {
+            if ($old !== '') {
+                $old = RecordValue::content($type, $old);
+            }
             $new = RecordValue::content($type, $new, $rrsetData);
         }
 
@@ -556,6 +566,9 @@ class PowerDNS implements DnsHostingProviderInterface {
         }
 
         $remaining = [];
+        if ($recordType === RecordType::CAA) {
+            $value = RecordValue::content($type, $value);
+        }
         $normValue = rtrim($value, '.');
 
         foreach ($existingValues as $content) {
