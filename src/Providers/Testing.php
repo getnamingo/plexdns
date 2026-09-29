@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use PDO;
 

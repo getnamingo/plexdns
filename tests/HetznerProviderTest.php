@@ -9,7 +9,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
-use PlexDNS\Providers\Hetzner;
+use Namingo\Cardo\DNS\Providers\Hetzner;
 
 function expect(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

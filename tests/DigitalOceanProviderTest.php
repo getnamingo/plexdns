@@ -9,8 +9,8 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
-use PlexDNS\Providers\DigitalOcean;
-use PlexDNS\UnsupportedProviderException;
+use Namingo\Cardo\DNS\Providers\DigitalOcean;
+use Namingo\Cardo\DNS\UnsupportedProviderException;
 
 function expect(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

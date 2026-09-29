@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use Dnsimple\Client;
 use PDO;
@@ -129,7 +129,7 @@ class DNSimple implements DnsHostingProviderInterface {
     }
 
     public function sync(PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('DNSimple synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('DNSimple synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {

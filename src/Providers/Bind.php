@@ -12,9 +12,9 @@
     'bindip_ns3' => '192.168.1.102',
 ]; */
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
-use PlexDNS\Clients\Bind9ApiClient as ApiClient;
+use Namingo\Cardo\DNS\Clients\Bind9ApiClient as ApiClient;
 
 class Bind implements DnsHostingProviderInterface {
     private $client;
@@ -174,7 +174,7 @@ class Bind implements DnsHostingProviderInterface {
     }
 
     public function sync(\PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('Bind synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('Bind synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {

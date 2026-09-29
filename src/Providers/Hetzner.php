@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use GuzzleHttp\Client;
 use PDO;
@@ -90,7 +90,7 @@ class Hetzner implements DnsHostingProviderInterface {
     }
 
     public function sync(PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('Hetzner synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('Hetzner synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {

@@ -39,7 +39,7 @@ final class DigitalOceanServiceFake
     }
 }
 
-class_alias(DigitalOceanServiceFake::class, 'PlexDNS\\Providers\\DigitalOcean');
+class_alias(DigitalOceanServiceFake::class, 'Namingo\Cardo\DNS\\Providers\\DigitalOcean');
 
 function expect(bool $condition, string $message): void
 {
@@ -48,7 +48,7 @@ function expect(bool $condition, string $message): void
 
 $db = new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$service = new PlexDNS\Service($db);
+$service = new Namingo\Cardo\DNS\Service($db);
 $service->install();
 
 $order = [

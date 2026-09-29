@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use PlexDNS\Providers\Bunny;
-use PlexDNS\Providers\ClouDNS;
-use PlexDNS\Providers\Hetzner;
-use PlexDNS\Providers\RecordValue;
+use Namingo\Cardo\DNS\Providers\Bunny;
+use Namingo\Cardo\DNS\Providers\ClouDNS;
+use Namingo\Cardo\DNS\Providers\Hetzner;
+use Namingo\Cardo\DNS\Providers\RecordValue;
 
 function expect(bool $condition, string $message): void
 {

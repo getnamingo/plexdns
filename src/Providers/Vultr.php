@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use Vultr\VultrPhp\Services\DNS\DNSService;
 use Vultr\VultrPhp\Services\DNS\Domain;
@@ -114,7 +114,7 @@ class Vultr implements DnsHostingProviderInterface {
     }
 
     public function sync(\PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('Vultr synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('Vultr synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {

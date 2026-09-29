@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -408,28 +408,28 @@ class DigitalOcean implements DnsHostingProviderInterface
 
     public function enableDNSSEC(string $domainName): array
     {
-        throw new \PlexDNS\UnsupportedProviderException(
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
             'DigitalOcean DNS does not support DNSSEC.'
         );
     }
 
     public function disableDNSSEC(string $domainName): bool
     {
-        throw new \PlexDNS\UnsupportedProviderException(
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
             'DigitalOcean DNS does not support DNSSEC.'
         );
     }
 
     public function getDNSSECStatus(string $domainName): array
     {
-        throw new \PlexDNS\UnsupportedProviderException(
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
             'DigitalOcean DNS does not support DNSSEC.'
         );
     }
 
     public function getDSRecords(string $domainName): array
     {
-        throw new \PlexDNS\UnsupportedProviderException(
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
             'DigitalOcean DNS does not support DNSSEC or DS records.'
         );
     }

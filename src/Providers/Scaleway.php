@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -167,7 +167,7 @@ class Scaleway implements DnsHostingProviderInterface
         $parent = $this->resolveManagedDomain($dnsZone);
 
         if ($dnsZone === $parent) {
-            throw new \PlexDNS\UnsupportedProviderException(
+            throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
                 'Scaleway root DNS zones cannot be deleted independently from their managed domain.'
             );
         }
@@ -628,7 +628,7 @@ class Scaleway implements DnsHostingProviderInterface
         $domain = $this->resolveManagedDomain($dnsZone);
 
         if ($dnsZone !== $domain) {
-            throw new \PlexDNS\UnsupportedProviderException(
+            throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
                 'Scaleway DNSSEC is managed at the parent domain level, not per sub-zone.'
             );
         }

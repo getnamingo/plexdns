@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-use PlexDNS\Providers\Testing;
-use PlexDNS\Providers\Bunny;
-use PlexDNS\Service;
-use PlexDNS\UnsupportedProviderException;
+use Namingo\Cardo\DNS\Providers\Testing;
+use Namingo\Cardo\DNS\Providers\Bunny;
+use Namingo\Cardo\DNS\Service;
+use Namingo\Cardo\DNS\UnsupportedProviderException;
 
 final class BunnySyncFake extends Bunny
 {

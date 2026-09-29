@@ -9,9 +9,9 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
-use PlexDNS\Providers\Cloudflare;
-use PlexDNS\Providers\DNSimple;
-use PlexDNS\Providers\Vultr;
+use Namingo\Cardo\DNS\Providers\Cloudflare;
+use Namingo\Cardo\DNS\Providers\DNSimple;
+use Namingo\Cardo\DNS\Providers\Vultr;
 
 function expect(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

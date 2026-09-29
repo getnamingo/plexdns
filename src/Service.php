@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS;
+namespace Namingo\Cardo\DNS;
 
 use PDO;
 use Exception;

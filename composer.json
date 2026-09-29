@@ -1,7 +1,7 @@
 {
     "name": "namingo/plexdns",
-    "description": "A unified, multi-provider DNS management tool",
-    "homepage": "https://github.com/getnamingo/plexdns",
+    "description": "Cardo DNS - a unified, multi-provider DNS management library",
+    "homepage": "https://github.com/getnamingo/cardo-dns",
     "license": "MIT",
     "type": "library",
     "minimum-stability": "stable",
@@ -26,9 +26,10 @@
     },
     "autoload": {
         "psr-4": {
-            "PlexDNS\\": "src/"
+            "Namingo\\Cardo\\DNS\\": "src/"
         },
         "files": [
+            "src/compat.php",
             "src/Helpers.php"
         ]
     },
@@ -38,6 +39,7 @@
     "scripts": {
         "analyze": "phpstan analyse src --level=0 --memory-limit=512M",
         "test": [
+            "php tests/CompatibilityTest.php",
             "php tests/TestingProviderTest.php",
             "php tests/HetznerProviderTest.php",
             "php tests/HetznerServiceTest.php",

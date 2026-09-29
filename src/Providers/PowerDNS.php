@@ -61,7 +61,7 @@
     'powerdnsip_ns13' => '192.168.1.13',
 ]; */
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use Exonet\Powerdns\Powerdns as PowerdnsApi;
 use Exonet\Powerdns\RecordType;
@@ -364,7 +364,7 @@ class PowerDNS implements DnsHostingProviderInterface {
     }
 
     public function sync(\PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('PowerDNS synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('PowerDNS synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {

@@ -44,7 +44,7 @@ final class GandiLiveDNSServiceFake
     public function getDSRecords($name): array { return []; }
 }
 
-class_alias(GandiLiveDNSServiceFake::class, 'PlexDNS\\Providers\\GandiLiveDNS');
+class_alias(GandiLiveDNSServiceFake::class, 'Namingo\Cardo\DNS\\Providers\\GandiLiveDNS');
 
 function expect(bool $condition, string $message): void
 {
@@ -53,7 +53,7 @@ function expect(bool $condition, string $message): void
 
 $db = new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$service = new PlexDNS\Service($db);
+$service = new Namingo\Cardo\DNS\Service($db);
 $service->install();
 
 $order = [

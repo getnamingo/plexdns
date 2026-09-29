@@ -1,7 +1,7 @@
 <?php
 
 use Dotenv\Dotenv;
-use PlexDNS\Service;
+use Namingo\Cardo\DNS\Service;
 
 // Optional table name overrides
 // define('PLEX_TABLE_ZONES', 'plexdns_zones');
