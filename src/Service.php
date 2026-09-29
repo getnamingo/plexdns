@@ -385,9 +385,7 @@ class Service
             ':domain_id' => $domainId,
             ':type' => $data['record_type'],
             ':host' => $data['record_name'],
-            ':value' => $data['record_type'] === 'SRV'
-                ? (int)$data['record_weight'] . ' ' . (int)$data['record_port'] . ' ' . $data['record_value']
-                : $data['record_value'],
+            ':value' => $this->canonicalLocalRecordValue($data),
             ':ttl' => (int) $data['record_ttl'],
             ':priority' => isset($data['record_priority']) ? (int) $data['record_priority'] : 0,
             ':created_at' => date('Y-m-d H:i:s'),
@@ -563,9 +561,7 @@ class Service
         ";
         $updateParams = [
             ':ttl'        => (int)$data['record_ttl'],
-            ':value'      => $type === 'SRV'
-                ? (int)$data['record_weight'] . ' ' . (int)$data['record_port'] . ' ' . $data['record_value']
-                : $data['record_value'],
+            ':value'      => $this->canonicalLocalRecordValue($data),
             ':priority'   => isset($data['record_priority']) ? (int)$data['record_priority'] : 0,
             ':updated_at' => date('Y-m-d H:i:s'),
             ':record_id'  => $recordId,
@@ -767,6 +763,31 @@ class Service
         }
 
         return true;
+    }
+
+    private function canonicalLocalRecordValue(array $data): string
+    {
+        $type = strtoupper((string)($data['record_type'] ?? ''));
+        $value = (string)($data['record_value'] ?? '');
+
+        if ($type === 'SRV') {
+            return (int)($data['record_weight'] ?? 0)
+                . ' ' . (int)($data['record_port'] ?? 0)
+                . ' ' . $value;
+        }
+
+        if ($type === 'CAA' && array_key_exists('record_tag', $data)) {
+            $trimmed = trim($value);
+            if (preg_match('/^\\d+\\s+(?:issue|issuewild|iodef)\\s+.+$/i', $trimmed)) {
+                return $trimmed;
+            }
+
+            return (int)($data['record_flags'] ?? 0)
+                . ' ' . strtolower(trim((string)$data['record_tag']))
+                . ' ' . $value;
+        }
+
+        return $value;
     }
 
     /**
