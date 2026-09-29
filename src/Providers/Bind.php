@@ -138,6 +138,10 @@ class Bind implements DnsHostingProviderInterface {
             $priority = (int)($rrsetData['priority'] ?? 10);
             $exchange = rtrim($rrsetData['records'][0], '.');
             $rdata = "$priority $exchange";
+        } elseif ($type === 'SRV') {
+            $rdata = RecordValue::content($type, (string)$rrsetData['records'][0], $rrsetData, true);
+        } elseif ($type === 'CAA') {
+            $rdata = RecordValue::content($type, (string)$rrsetData['records'][0], $rrsetData);
         } elseif (in_array($type, ['TXT', 'SPF'], true)) {
             $rdata = $this->stripOuterQuotes($rrsetData['records'][0]);
         } else {
@@ -203,6 +207,12 @@ class Bind implements DnsHostingProviderInterface {
         if (in_array($typeUpper, ['TXT', 'SPF'], true)) {
             $oldValue    = $this->stripOuterQuotes($oldValue);
             $recordValue = $this->stripOuterQuotes($rrsetData['records'][0]);
+        } elseif ($typeUpper === 'SRV') {
+            $oldValue = RecordValue::content($typeUpper, (string)$oldValue, $rrsetData, true);
+            $recordValue = RecordValue::content($typeUpper, (string)$rrsetData['records'][0], $rrsetData, true);
+        } elseif ($typeUpper === 'CAA') {
+            $oldValue = RecordValue::content($typeUpper, (string)$oldValue, $rrsetData);
+            $recordValue = RecordValue::content($typeUpper, (string)$rrsetData['records'][0], $rrsetData);
         } else {
             $recordValue = $rrsetData['records'][0];
         }
