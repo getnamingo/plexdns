@@ -2,17 +2,9 @@
 
 Cardo DNS is a **unified, multi-provider DNS management tool** that allows users to manage DNS zones and records across multiple DNS hosting providers using a common interface.
 
-## Namespace and compatibility
+[![StandWithUkraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://github.com/vshymanskyy/StandWithUkraine/blob/main/docs/README.md)
 
-The canonical PHP namespace is:
-
-```php
-Namingo\Cardo\DNS
-```
-
-The Composer package name intentionally remains `namingo/plexdns` for installation compatibility.
-
-Existing applications using the historical `PlexDNS\...` namespace remain supported automatically through Composer. New integrations should use `Namingo\Cardo\DNS\...`.
+[![SWUbanner](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg)](https://github.com/vshymanskyy/StandWithUkraine/blob/main/docs/README.md)
 
 ## Installation
 
@@ -56,23 +48,11 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Desec** | `API_KEY` | | ✅ | ✅ |
 | **DNSimple** | `API_KEY` | Account access token | ✅ | ✅ |
 | **DigitalOcean** | `API_KEY` | Personal access token with domain access | ✅ | ❌ |
-| **Gandi LiveDNS** | `API_KEY` | PAT Bearer token preferred; optional `SHARING_ID` | ✅ | ✅ |
+| **Gandi LiveDNS** | `API_KEY` | PAT Bearer token | ✅ | ✅ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token | ✅ | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | [installer](bin/install-powerdns-ubuntu-26.04.sh) | ✅ | ✅ |
-| **Scaleway** | `API_KEY:PROJECT_ID` | Secret key + project ID; optional `PARENT_DOMAIN` for sub-zones | ✅ | ✅ |
+| **Scaleway** | `API_KEY:PROJECT_ID` | Secret key + project ID | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
-
-### Gandi LiveDNS notes
-
-Gandi LiveDNS uses RRsets, so Cardo DNS preserves sibling values when adding, updating, or deleting one local record. Personal Access Token Bearer authentication is the default; legacy `Apikey` authentication can be selected with `AUTH_SCHEME=Apikey`. `SHARING_ID` is supported for organization sharing contexts. LiveDNS DNSSEC status and DS data are supported. The LiveDNS API can add a domain but does not expose a matching remove-domain operation, so provider-side domain removal is reported as unsupported rather than silently faked.
-
-### Scaleway notes
-
-Scaleway DNS requires both a secret API key and a Project ID. Root DNS zones are tied to the managed domain and cannot be deleted independently; sub-zones can be created/deleted normally. DNSSEC operations apply to the managed root domain, not to an individual delegated sub-zone. Cardo DNS supports Scaleway record IDs, synchronization, BIND zone export, bulk record changes, and Scaleway's record types including ALIAS, TLSA, SSHFP, DS, NAPTR, DNAME, SVCB and HTTPS.
-
-### Important record types
-
-Cardo DNS normalizes structured **CAA** and **SRV** input across provider APIs so the same Service fields produce valid provider records. Standard presentation-format records such as **TLSA**, **SSHFP**, **HTTPS/SVCB**, **NAPTR**, **DS**, and **PTR** are passed through where the upstream provider supports them; providers with structured APIs are mapped explicitly. Provider-side limitations still apply, so Cardo DNS does not advertise record types that the upstream DNS service cannot create.
 
 ### Testing Provider
 
@@ -92,22 +72,22 @@ does not publish, resolve, validate, propagate, or persist DNS data and must not
 be used in production. Its DNSSEC support only simulates enabled/disabled state;
 it does not create keys or DS records.
 
-### Slave Zone Support
+### Secondary Zone Support
 
-Different DNS providers handle slave (secondary) zones differently. **BIND9 and PowerDNS require explicit slave configuration**, meaning you must manually add the slave servers to your `$config` array for them to sync from the master. This involves passing the necessary API details, such as `apikey_nsX` and `bindip_nsX` for BIND9 or `powerdnsip_nsX` for PowerDNS. In contrast, **cloud-based DNS providers handle replication automatically**, so there is no need to configure slave servers manually. Once a zone is added, it is automatically synchronized across their global infrastructure without additional setup.
+Different DNS providers handle secondary zones differently. **BIND9 and PowerDNS require explicit secondary configuration**, meaning you must manually add the secondary servers to your `$config` array for them to sync from the primary. This involves passing the necessary API details, such as `apikey_nsX` and `bindip_nsX` for BIND9 or `powerdnsip_nsX` for PowerDNS. In contrast, **cloud-based DNS providers handle replication automatically**, so there is no need to configure secondary servers manually. Once a zone is added, it is automatically synchronized across their global infrastructure without additional setup.
 
 **BIND9 Example**
 
 ```php
 $config = [
-    'apikey' => 'masterUser:masterPass',  // Master API Key
-    'bindip' => '192.168.1.100',  // Master BIND9 server IP
+    'apikey' => 'primaryUser:primaryPass',  // Primary API Key
+    'bindip' => '192.168.1.100',  // Primary BIND9 server IP
 
-    // Slave 1 (NS2)
-    'apikey_ns2' => 'slaveUser1:slavePass1',
+    // Secondary 1 (NS2)
+    'apikey_ns2' => 'secondaryUser1:secondaryPass1',
     'bindip_ns2' => '192.168.1.101',
     
-    // You can add up to 13 slave servers (NS2 to NS13)
+    // You can add up to 13 secondary servers (NS2 to NS13)
 ];
 ```
 
@@ -115,33 +95,40 @@ $config = [
 
 ```php
 $config = [
-    'apikey' => 'master_api_key',  // Master PowerDNS API Key
-    'powerdnsip' => '127.0.0.1',  // Master PowerDNS IP
-    'pdns_master_ip' => '192.168.1.1', // Master IP for slaves to sync from
+    'apikey' => 'primary_api_key',  // Primary PowerDNS API Key
+    'powerdnsip' => '127.0.0.1',  // Primary PowerDNS IP
+    'pdns_master_ip' => '192.168.1.1', // Primary IP for secondaries to sync from
 
-    // Slave 1 (NS2)
-    'apikey_ns2' => 'slave2_api_key',
+    // Secondary 1 (NS2)
+    'apikey_ns2' => 'secondary2_api_key',
     'powerdnsip_ns2' => '192.168.1.2',
 
-    // You can add up to 13 slave servers (NS2 to NS13)
+    // You can add up to 13 secondary servers (NS2 to NS13)
 ];
 ```
 
+## Support
+
+Need help, found a bug, or have an idea for Cardo DNS?
+
+- **Email:** [help@namingo.org](mailto:help@namingo.org)
+- **Discord:** Join the community on [Discord](https://discord.gg/97R9VCrWgc)
+- **GitHub Issues:** Report bugs or request features in [GitHub Issues](https://github.com/getnamingo/cardo-dns/issues)
+
+Questions, feedback, and contributions are always welcome.
+
 ## Acknowledgements
 
-We extend our gratitude to:
-- [QCloudns API Client](https://github.com/sussdorf/qcloudns) which served as inspiration for our ClouDNS module.
+Thanks to the [QCloudns API Client](https://github.com/sussdorf/qcloudns), which inspired our ClouDNS module.
 
-## License
-Cardo DNS is licensed under the **MIT License**.
+## Support This Project
 
-## Contributing
-We welcome contributions! Feel free to submit **issues** or **pull requests** to improve the project.
+If you find Cardo DNS useful, consider donating:
 
-1. Fork the repository.
-2. Create a new branch.
-3. Make your changes and commit them.
-4. Submit a pull request.
+- [Donate via Stripe](https://donate.stripe.com/7sI2aI4jV3Offn28ww)
+- BTC: `bc1q9jhxjlnzv0x4wzxfp8xzc6w289ewggtds54uqa`
+- ETH: `0x330c1b148368EE4B8756B176f1766d52132f0Ea8`
 
-## Support
-For any issues, please open an issue on GitHub or contact us at **help@namingo.org**.
+## Licensing
+
+Cardo DNS is licensed under the MIT License.
