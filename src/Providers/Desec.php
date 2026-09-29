@@ -1,6 +1,6 @@
 <?php
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -95,7 +95,7 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function sync(\PDO $db, string $domainName): int {
-        throw new \PlexDNS\UnsupportedProviderException('Desec synchronization is not supported.');
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException('Desec synchronization is not supported.');
     }
 
     public function retrieveSpecificRRset($domainName, $subname, $type) {
