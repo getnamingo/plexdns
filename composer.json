@@ -43,6 +43,8 @@
             "php tests/HetznerServiceTest.php",
             "php tests/DigitalOceanProviderTest.php",
             "php tests/DigitalOceanServiceTest.php",
+            "php tests/GandiLiveDNSProviderTest.php",
+            "php tests/GandiLiveDNSServiceTest.php",
             "php tests/ScalewayProviderTest.php",
             "php tests/ScalewayServiceTest.php",
             "php tests/ProviderDnssecTest.php",

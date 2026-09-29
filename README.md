@@ -44,10 +44,15 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **Desec** | `API_KEY` | | ✅ | ✅ |
 | **DNSimple** | `API_KEY` | Account access token | ✅ | ✅ |
 | **DigitalOcean** | `API_KEY` | Personal access token with domain access | ✅ | ❌ |
+| **Gandi LiveDNS** | `API_KEY` | PAT Bearer token preferred; optional `SHARING_ID` | ✅ | ✅ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token | ✅ | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | [installer](bin/install-powerdns-ubuntu-26.04.sh) | ✅ | ✅ |
 | **Scaleway** | `API_KEY:PROJECT_ID` | Secret key + project ID; optional `PARENT_DOMAIN` for sub-zones | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
+
+### Gandi LiveDNS notes
+
+Gandi LiveDNS uses RRsets, so PlexDNS preserves sibling values when adding, updating, or deleting one local record. Personal Access Token Bearer authentication is the default; legacy `Apikey` authentication can be selected with `AUTH_SCHEME=Apikey`. `SHARING_ID` is supported for organization sharing contexts. LiveDNS DNSSEC status and DS data are supported. The LiveDNS API can add a domain but does not expose a matching remove-domain operation, so provider-side domain removal is reported as unsupported rather than silently faked.
 
 ### Scaleway notes
 

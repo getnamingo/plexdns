@@ -63,6 +63,9 @@ class Service
             case 'DigitalOcean':
                 $this->dnsProvider = new Providers\DigitalOcean($config);
                 break;
+            case 'GandiLiveDNS':
+                $this->dnsProvider = new Providers\GandiLiveDNS($config);
+                break;
             case 'Hetzner':
                 $this->dnsProvider = new Providers\Hetzner($config, $this->db);
                 break;
@@ -453,8 +456,68 @@ class Service
         $type = $data['record_type'];
         $host = $data['record_name'];
 
-        // deSEC handling
-        if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
+        // RRset-native providers need all sibling values preserved when one row changes.
+        if ($data['provider'] === 'GandiLiveDNS') {
+            $rows = $this->fetchData(
+                "SELECT id, value, priority
+                 FROM " . plexRecordsTable() . "
+                 WHERE domain_id = :domain_id AND type = :type AND host = :host",
+                [
+                    ':domain_id' => $domainId,
+                    ':type' => $type,
+                    ':host' => $host,
+                ]
+            );
+
+            if (!$rows) {
+                throw new \RuntimeException("RRset not found for update.");
+            }
+
+            $records = [];
+            foreach ($rows as $row) {
+                if ((string)$row['id'] === (string)$recordId) {
+                    $newValue = $this->canonicalLocalRecordValue($data);
+                    if ($type === 'MX' || $type === 'SRV') {
+                        $newValue = (int)($data['record_priority'] ?? 0) . ' ' . $newValue;
+                    }
+                    $records[] = $newValue;
+                } else {
+                    $records[] = $type === 'MX'
+                        ? (int)$row['priority'] . ' ' . $row['value']
+                        : ($type === 'SRV'
+                            ? (int)$row['priority'] . ' ' . $row['value']
+                            : $row['value']);
+                }
+            }
+
+            $rrsetData = [
+                'ttl' => (int)$data['record_ttl'],
+                'records' => array_values(array_unique($records)),
+            ];
+
+            if ($type === 'MX') {
+                $rrsetData['priority'] = $data['record_priority'];
+            }
+            if ($type === 'SRV') {
+                $rrsetData['priority'] = $data['record_priority'];
+                $rrsetData['weight'] = $data['record_weight'];
+                $rrsetData['port'] = $data['record_port'];
+            }
+            if ($type === 'CAA') {
+                if (array_key_exists('record_flags', $data)) {
+                    $rrsetData['flags'] = (int)$data['record_flags'];
+                }
+                if (array_key_exists('record_tag', $data)) {
+                    $rrsetData['tag'] = (string)$data['record_tag'];
+                }
+            }
+
+            try {
+                $this->dnsProvider->modifyRRset($domainName, $host, $type, $rrsetData);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to update DNS record: " . $e->getMessage());
+            }
+        } elseif ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT id, recordId, value, priority
@@ -652,8 +715,19 @@ class Service
             throw new \RuntimeException("DNS provider is not set.");
         }
 
-        // deSEC multi-value delete
-        if ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
+        // Gandi LiveDNS stores values as RRsets. Delete only this local value remotely.
+        if ($data['provider'] === 'GandiLiveDNS') {
+            try {
+                $this->dnsProvider->deleteRRset(
+                    $domainName,
+                    $host,
+                    $type,
+                    $record[0]['value']
+                );
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Failed to delete DNS record: " . $e->getMessage());
+            }
+        } elseif ($data['provider'] === 'Desec' && in_array($type, ['A', 'TXT', 'MX'], true)) {
             // Fetch all rows for this RRset
             $rows = $this->fetchData(
                 "SELECT id, recordId, value, priority
@@ -828,6 +902,7 @@ class Service
             'Cloudflare',
             'ClouDNS',
             'DNSimple',
+            'GandiLiveDNS',
             'PowerDNS',
             'Scaleway',
             'Vultr',
