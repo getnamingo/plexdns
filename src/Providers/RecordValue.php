@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 /**
  * Canonical formatting for record types whose RDATA is split into fields by Service.
  *
  * Providers that expose separate priority/weight/port/CAA fields can keep using
  * those fields. Providers that accept textual RDATA can use this helper so the
- * same public PlexDNS input shape produces valid wire-format content.
+ * same public Namingo\Cardo\DNS input shape produces valid wire-format content.
  */
 final class RecordValue
 {
