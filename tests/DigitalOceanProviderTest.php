@@ -121,6 +121,36 @@ $p = provider([response(['domain_records' => [
 $specific = $p->retrieveSpecificRRset('example.com', 'www', 'A');
 expect(count($specific) === 1 && $specific[0]['id'] === 1, 'Specific record retrieval.');
 
+// Without a persisted ID, structured RDATA must distinguish otherwise identical targets.
+$history = [];
+$p = provider([
+    response(['domain_records' => [
+        ['id' => 201, 'type' => 'SRV', 'name' => '_sip._tcp', 'data' => 'sip.example.com', 'ttl' => 300, 'priority' => 10, 'weight' => 5, 'port' => 5060],
+        ['id' => 202, 'type' => 'SRV', 'name' => '_sip._tcp', 'data' => 'sip.example.com', 'ttl' => 300, 'priority' => 20, 'weight' => 10, 'port' => 5061],
+    ]]),
+    response(['domain_record' => ['id' => 202, 'type' => 'SRV', 'name' => '_sip._tcp', 'data' => 'new.example.com', 'ttl' => 300, 'priority' => 20, 'weight' => 10, 'port' => 5061]]),
+], $history);
+expect($p->modifyRRset('example.com', '_sip._tcp', 'SRV', [
+    'old_value' => '20 10 5061 sip.example.com',
+    'priority' => 20,
+    'weight' => 10,
+    'port' => 5061,
+    'ttl' => 300,
+    'records' => ['new.example.com'],
+]) === true, 'Structured SRV fallback update.');
+expect($history[1]['request']->getUri()->getPath() === '/v2/domains/example.com/records/202', 'SRV fallback must select the complete RDATA match.');
+
+$history = [];
+$p = provider([
+    response(['domain_records' => [
+        ['id' => 301, 'type' => 'CAA', 'name' => '@', 'data' => 'ca.example', 'ttl' => 300, 'flags' => 0, 'tag' => 'issue'],
+        ['id' => 302, 'type' => 'CAA', 'name' => '@', 'data' => 'ca.example', 'ttl' => 300, 'flags' => 128, 'tag' => 'iodef'],
+    ]]),
+    new Response(204),
+], $history);
+expect($p->deleteRRset('example.com', '@', 'CAA', '128 iodef ca.example') === true, 'Structured CAA fallback delete.');
+expect($history[1]['request']->getUri()->getPath() === '/v2/domains/example.com/records/302', 'CAA fallback must select the complete RDATA match.');
+
 $history = [];
 $p = provider([new Response(204)], $history);
 expect($p->deleteDomain('example.com') === true, 'Domain deletion.');
