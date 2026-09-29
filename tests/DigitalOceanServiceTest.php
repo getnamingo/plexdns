@@ -83,6 +83,10 @@ expect(
 );
 expect(DigitalOceanServiceFake::$calls[0][1]['flags'] === 0, 'CAA flags forwarded.');
 expect(DigitalOceanServiceFake::$calls[0][1]['tag'] === 'issue', 'CAA tag forwarded.');
+expect(
+    $db->query('SELECT value FROM ' . plexRecordsTable() . ' WHERE id = ' . $id)->fetchColumn() === '0 issue letsencrypt.org',
+    'CAA must be stored locally as complete canonical RDATA.'
+);
 
 $service->updateRecord([
     'provider' => 'DigitalOcean',
@@ -97,6 +101,10 @@ $service->updateRecord([
 ]);
 expect(DigitalOceanServiceFake::$calls[1][1]['record_id'] === '98765', 'Update uses saved provider record ID.');
 expect(DigitalOceanServiceFake::$calls[1][1]['tag'] === 'issue', 'CAA update tag forwarded.');
+expect(
+    $db->query('SELECT value FROM ' . plexRecordsTable() . ' WHERE id = ' . $id)->fetchColumn() === '0 issue pki.goog',
+    'Updated CAA must remain canonical locally.'
+);
 
 $service->delRecord([
     'provider' => 'DigitalOcean',
