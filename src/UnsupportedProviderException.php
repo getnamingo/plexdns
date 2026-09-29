@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS;
+namespace Namingo\Cardo\DNS;
 
 final class UnsupportedProviderException extends \BadMethodCallException
 {
