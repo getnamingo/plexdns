@@ -69,6 +69,9 @@ class Service
             case 'PowerDNS':
                 $this->dnsProvider = new Providers\PowerDNS($config);
                 break;
+            case 'Scaleway':
+                $this->dnsProvider = new Providers\Scaleway($config);
+                break;
             case 'Testing':
                 $this->dnsProvider = new Providers\Testing($this->db);
                 break;
@@ -712,7 +715,7 @@ class Service
             // Default behaviour: delete whole RRset for non-deSEC or non-multi types
             try {
                 if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                    if (in_array($data['provider'], ['Bunny', 'AnycastDNS', 'Cloudflare', 'ClouDNS', 'DNSimple', 'DigitalOcean', 'Hetzner', 'Vultr'], true)) {
+                    if (in_array($data['provider'], ['Bunny', 'AnycastDNS', 'Cloudflare', 'ClouDNS', 'DNSimple', 'DigitalOcean', 'Hetzner', 'Scaleway', 'Vultr'], true)) {
                         $this->dnsProvider->deleteRRset(
                             $domainName,
                             $host,
@@ -805,6 +808,7 @@ class Service
             'ClouDNS',
             'DNSimple',
             'PowerDNS',
+            'Scaleway',
             'Vultr',
             'Testing' => [
                 'supported' => true,
