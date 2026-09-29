@@ -21,6 +21,22 @@ expect(
         === '0 issue letsencrypt.org',
     'CAA split fields must become complete presentation RDATA.'
 );
+expect(
+    RecordValue::content(
+        'CAA',
+        'letsencrypt.org; validationmethods=dns-01',
+        ['flags' => 0, 'tag' => 'issue']
+    ) === '0 issue "letsencrypt.org; validationmethods=dns-01"',
+    'CAA values containing semicolons and whitespace must be quoted.'
+);
+expect(
+    RecordValue::content(
+        'CAA',
+        'ca.example; note="quoted"\\path',
+        ['flags' => 0, 'tag' => 'iodef']
+    ) === '0 iodef "ca.example; note=\\"quoted\\"\\\\path"',
+    'CAA quoted values must escape quotes and backslashes.'
+);
 
 expect(
     RecordValue::content('SRV', 'sip.example.com.', [
