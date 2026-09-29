@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
+use Namingo\Cardo\DNS\ResourceNotFoundException;
 use Namingo\Cardo\DNS\Service;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
@@ -51,10 +52,19 @@ $log = cardoApiLogger($logPath);
 $service = new Service($pdo);
 $server = new Server($host, $port);
 
-$server->set([
+$serverOptions = [
     'http_compression' => true,
     'max_request' => 10000,
-]);
+];
+
+if ($provider === 'Testing') {
+    // Testing intentionally uses process-local in-memory SQLite. Keep one
+    // non-recycling worker so /install and subsequent requests share state.
+    $serverOptions['worker_num'] = 1;
+    $serverOptions['max_request'] = 0;
+}
+
+$server->set($serverOptions);
 
 $server->on('start', function (Server $server) use ($log, $host, $port, $provider): void {
     $log->info('Cardo DNS API server started.', [
@@ -257,6 +267,8 @@ $server->on('request', function (Request $request, Response $response) use ($api
         cardoApiRespond($response, 404, ['error' => 'Endpoint not found']);
     } catch (InvalidArgumentException $e) {
         cardoApiRespond($response, 400, ['error' => $e->getMessage()]);
+    } catch (ResourceNotFoundException $e) {
+        cardoApiRespond($response, 404, ['error' => $e->getMessage()]);
     } catch (RuntimeException $e) {
         $log->error('API operation failed.', [
             'request_id' => $requestId,
