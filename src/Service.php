@@ -685,8 +685,6 @@ class Service
 
         $domainName = $data['domain_name'];
         $recordId = $data['record_id'];
-        $type = $data['record_type'];
-        $host = $data['record_name'];
 
         // Fetch the domain configuration
         $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
@@ -698,22 +696,26 @@ class Service
 
         $domainId = $domain[0]['id'];
 
+        // record_id is Cardo's local database identifier. Resolve the authoritative
+        // metadata from storage instead of requiring callers to repeat it.
         $record = $this->fetchData(
-            "SELECT recordId, value, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            "SELECT recordId, type, host, value, ttl, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
             throw new \RuntimeException("Record does not exist.");
         }
-        if (strtoupper($type) === 'CAA') {
-            // CAA is stored locally as complete canonical RDATA (flags tag value).
-            // Use that value for provider matching/deletion even when callers use split fields.
-            $data['record_value'] = $record[0]['value'];
-        } elseif ($data['provider'] === 'Hetzner') {
-            $data['record_value'] = $record[0]['value'];
-            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
-                $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
-            }
+
+        $type = strtoupper((string)$record[0]['type']);
+        $host = (string)$record[0]['host'];
+        $data['record_type'] = $type;
+        $data['record_name'] = $host;
+        $data['record_value'] = (string)$record[0]['value'];
+        $data['record_ttl'] = (int)($record[0]['ttl'] ?? 0);
+        $data['record_priority'] = (int)($record[0]['priority'] ?? 0);
+
+        if ($data['provider'] === 'Hetzner' && in_array($type, ['MX', 'SRV'], true)) {
+            $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
         }
         $providerRecordId = $record[0]['recordId'];
         // Older versions stored uniqid() placeholders when the provider returned no ID.
