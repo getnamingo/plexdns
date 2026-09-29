@@ -685,8 +685,6 @@ class Service
 
         $domainName = $data['domain_name'];
         $recordId = $data['record_id'];
-        $type = $data['record_type'];
-        $host = $data['record_name'];
 
         // Fetch the domain configuration
         $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
@@ -698,20 +696,49 @@ class Service
 
         $domainId = $domain[0]['id'];
 
+        // record_id is Cardo's local database identifier. Resolve the authoritative
+        // metadata from storage instead of requiring callers to repeat it.
         $record = $this->fetchData(
-            "SELECT recordId, value, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
+            "SELECT recordId, type, host, value, ttl, priority FROM " . plexRecordsTable() . " WHERE id = :record_id AND domain_id = :domain_id",
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
             throw new \RuntimeException("Record does not exist.");
         }
-        if (strtoupper($type) === 'CAA') {
-            // CAA is stored locally as complete canonical RDATA (flags tag value).
-            // Use that value for provider matching/deletion even when callers use split fields.
-            $data['record_value'] = $record[0]['value'];
+
+        // Preserve metadata explicitly supplied by existing callers. The stored
+        // row is only a fallback so record_id-only callers (such as the HTTP API)
+        // do not need to repeat the record identity.
+        $storedType = strtoupper((string)$record[0]['type']);
+        $storedHost = (string)$record[0]['host'];
+
+        $type = isset($data['record_type']) && trim((string)$data['record_type']) !== ''
+            ? strtoupper((string)$data['record_type'])
+            : $storedType;
+        $host = array_key_exists('record_name', $data) && $data['record_name'] !== null
+            ? (string)$data['record_name']
+            : $storedHost;
+
+        $data['record_type'] = $type;
+        $data['record_name'] = $host;
+
+        if (!array_key_exists('record_value', $data) || $data['record_value'] === null) {
+            $data['record_value'] = (string)$record[0]['value'];
+        }
+        if (!array_key_exists('record_ttl', $data) || $data['record_ttl'] === null) {
+            $data['record_ttl'] = (int)($record[0]['ttl'] ?? 0);
+        }
+        if (!array_key_exists('record_priority', $data) || $data['record_priority'] === null) {
+            $data['record_priority'] = (int)($record[0]['priority'] ?? 0);
+        }
+
+        // Preserve the provider-specific canonicalization that delRecord already
+        // performed before record_id-only deletion was introduced.
+        if ($type === 'CAA') {
+            $data['record_value'] = (string)$record[0]['value'];
         } elseif ($data['provider'] === 'Hetzner') {
-            $data['record_value'] = $record[0]['value'];
-            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+            $data['record_value'] = (string)$record[0]['value'];
+            if (in_array($type, ['MX', 'SRV'], true)) {
                 $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
             }
         }

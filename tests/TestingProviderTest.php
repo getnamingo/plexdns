@@ -151,9 +151,6 @@ $service->delRecord([
     'provider' => 'Testing',
     'domain_name' => 'example.test',
     'record_id' => $recordId,
-    'record_name' => 'www',
-    'record_type' => 'A',
-    'record_value' => '192.0.2.2',
 ]);
 expect($provider->retrieveAllRRsets('example.test') === [], 'Expected deleted record.');
 

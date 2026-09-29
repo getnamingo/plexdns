@@ -41,6 +41,8 @@ DNS_DIGITALOCEAN_API_KEY=your-provider-token
 
 `API_PROVIDER` accepts: `AnycastDNS`, `Bind`, `Bunny`, `Cloudflare`, `ClouDNS`, `Desec`, `DNSimple`, `DigitalOcean`, `GandiLiveDNS`, `Hetzner`, `PowerDNS`, `Scaleway`, `Testing`, and `Vultr`.
 
+For `API_PROVIDER=Testing`, use `DB_TYPE=sqlite` with `SQLITE_PATH=:memory:`. The Testing provider intentionally refuses file-backed SQLite databases.
+
 Provider credentials use the same `DNS_<PROVIDER>_*` convention as the main [`env-sample`](env-sample). Credentials remain server-side. Request bodies cannot replace the configured provider or its credentials.
 
 The daemon manages one provider per process. To expose multiple providers, run separate instances with different environments and ports.
