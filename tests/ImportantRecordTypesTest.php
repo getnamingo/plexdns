@@ -99,10 +99,4 @@ expect(
     'Hetzner CAA presentation RDATA.'
 );
 
-// Canonical CAA is also the local representation used for deletion fallback.
-$db = new PDO('sqlite::memory:');
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$service = new PlexDNS\Service($db);
-$service->install();
-
 echo "Important record type checks passed.\n";
