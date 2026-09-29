@@ -67,6 +67,7 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function createRRset($domainName, $rrsetData) {
+        $rrsetData = $this->normalizeRRsetData($rrsetData);
         $response = $this->client->request('POST', $domainName . '/rrsets/', [
             'headers' => $this->headers,
             'json' => $rrsetData
@@ -76,6 +77,10 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function createBulkRRsets($domainName, $rrsetDataArray) {
+        $rrsetDataArray = array_map(
+            fn($data) => $this->normalizeRRsetData($data),
+            $rrsetDataArray
+        );
         $response = $this->client->request('POST', $domainName . '/rrsets/', [
             'headers' => $this->headers,
             'json' => $rrsetDataArray
@@ -100,6 +105,9 @@ class Desec implements DnsHostingProviderInterface {
 
     public function modifyRRset($domainName, $subname, $type, $rrsetData) {
         $subname = $subname ?: '@';
+        $rrsetData['subname'] = $subname;
+        $rrsetData['type'] = strtoupper((string)$type);
+        $rrsetData = $this->normalizeRRsetData($rrsetData);
 
         $response = $this->client->request('PATCH', $domainName . '/rrsets/' . $subname . '/' . $type . '/', [
             'headers' => $this->headers,
@@ -110,6 +118,10 @@ class Desec implements DnsHostingProviderInterface {
     }
 
     public function modifyBulkRRsets($domainName, $rrsetDataArray) {
+        $rrsetDataArray = array_map(
+            fn($data) => $this->normalizeRRsetData($data),
+            $rrsetDataArray
+        );
         $response = $this->client->request('PUT', $domainName . '/rrsets/', [
             'headers' => $this->headers,
             'json' => $rrsetDataArray
@@ -132,6 +144,32 @@ class Desec implements DnsHostingProviderInterface {
         ]);
 
         return $response->getStatusCode() === 204;
+    }
+
+    private function normalizeRRsetData(array $data): array
+    {
+        $type = strtoupper((string)($data['type'] ?? ''));
+        $records = $data['records'] ?? [];
+
+        if (!is_array($records)) {
+            throw new \InvalidArgumentException("RRset 'records' must be an array.");
+        }
+
+        $data['type'] = $type;
+        $data['records'] = array_map(
+            fn($value) => RecordValue::content(
+                $type,
+                (string)$value,
+                $data,
+                $type === 'SRV',
+                $type === 'MX'
+            ),
+            $records
+        );
+
+        unset($data['priority'], $data['weight'], $data['port'], $data['flags'], $data['tag']);
+
+        return $data;
     }
 
     public function enableDNSSEC(string $domainName): array
