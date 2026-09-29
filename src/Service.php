@@ -633,8 +633,8 @@ class Service
 
         try {
             $this->executeQuery($updateQuery, $updateParams);
-            if ($data['provider'] === 'Hetzner') {
-                // Hetzner shares one TTL across every value in the RRSet.
+            if (in_array($data['provider'], ['Hetzner', 'GandiLiveDNS'], true)) {
+                // These providers share one TTL across every value in the RRSet.
                 $this->executeQuery(
                     "UPDATE " . plexRecordsTable() . " SET ttl = :ttl, updated_at = :updated_at
                      WHERE domain_id = :domain_id AND host = :host AND type = :type",
@@ -721,12 +721,18 @@ class Service
 
         // Gandi LiveDNS stores values as RRsets. Delete only this local value remotely.
         if ($data['provider'] === 'GandiLiveDNS') {
+            $gandiValue = (string)$record[0]['value'];
+            if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
+                // Local storage keeps priority separately; LiveDNS expects complete RDATA.
+                $gandiValue = (int)$record[0]['priority'] . ' ' . $gandiValue;
+            }
+
             try {
                 $this->dnsProvider->deleteRRset(
                     $domainName,
                     $host,
                     $type,
-                    $record[0]['value']
+                    $gandiValue
                 );
             } catch (\Throwable $e) {
                 throw new \RuntimeException("Failed to delete DNS record: " . $e->getMessage());
