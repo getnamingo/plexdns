@@ -93,6 +93,12 @@ class Cloudflare implements DnsHostingProviderInterface {
         try {
             $zoneId = $this->zones->getZoneID($domainName);
             $priority = isset($rrsetData['priority']) ? (string) $rrsetData['priority'] : '';
+            $type = strtoupper((string)$rrsetData['type']);
+            $content = RecordValue::content(
+                $type,
+                (string)$rrsetData['records'][0],
+                $rrsetData
+            );
 
             $sub = $rrsetData['subname'] ?? '';
             $name = ($sub === '' || $sub === '@')
@@ -101,9 +107,9 @@ class Cloudflare implements DnsHostingProviderInterface {
 
             $result = $this->dns->addRecord(
                 $zoneId,
-                $rrsetData['type'],
+                $type,
                 $name,
-                $rrsetData['records'][0],
+                $content,
                 isset($rrsetData['ttl']) ? (int)$rrsetData['ttl'] : 1,
                 false,
                 $priority
@@ -156,6 +162,7 @@ class Cloudflare implements DnsHostingProviderInterface {
             $newContent = is_array($rrsetData['records'])
                 ? (string) reset($rrsetData['records'])
                 : (string) $rrsetData['records'];
+            $newContent = RecordValue::content(strtoupper((string)$type), $newContent, $rrsetData);
 
             $lookupContent = isset($rrsetData['old_value']) && $rrsetData['old_value'] !== ''
                 ? (string) $rrsetData['old_value']
