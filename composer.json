@@ -45,6 +45,7 @@
             "php tests/DigitalOceanServiceTest.php",
             "php tests/GandiLiveDNSProviderTest.php",
             "php tests/GandiLiveDNSServiceTest.php",
+            "php tests/ImportantRecordTypesTest.php",
             "php tests/ScalewayProviderTest.php",
             "php tests/ScalewayServiceTest.php",
             "php tests/ProviderDnssecTest.php",
