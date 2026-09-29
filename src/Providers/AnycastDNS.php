@@ -205,6 +205,9 @@ class AnycastDNS implements DnsHostingProviderInterface {
         }
 
         $name = trim((string)$subname) === '' ? '@' : $subname;
+        if (strtoupper((string)$type) === 'CAA') {
+            $value = RecordValue::content('CAA', (string)$value);
+        }
 
         $recordId = $persistedRecordId;
         $recordId = $recordId === '' ? null : $recordId;
