@@ -62,6 +62,7 @@ function getProviderDisplayName(string $provider): string {
         'DESEC'       => 'Desec',
         'DNSIMPLE'    => 'DNSimple',
         'DIGITALOCEAN'=> 'DigitalOcean',
+        'GANDILIVEDNS' => 'GandiLiveDNS',
         'HETZNER'     => 'Hetzner',
         'POWERDNS'    => 'PowerDNS',
         'SCALEWAY'    => 'Scaleway',
@@ -77,7 +78,7 @@ $dotenv->load();
 
 // Demo creates/deletes a zone and uninstalls its tables: use a test zone/database.
 // Set PROVIDER in .env, or change the default below. Names match DNS_<PROVIDER>_*.
-// Examples: Hetzner, DigitalOcean, Scaleway, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
+// Examples: Hetzner, GandiLiveDNS, DigitalOcean, Scaleway, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
 $provider = $_ENV['PROVIDER'] ?? 'Desec';
 $domainName = 'example.com'; // Replace with your test domain.
 $runDnssec = true;          // Skipped for providers without implemented DNSSEC.
@@ -98,6 +99,8 @@ try {
     $cloudnsAuthPassword = $credentials['AUTH_PASSWORD'] ?? null;
     $projectId = $credentials['PROJECT_ID'] ?? null;
     $parentDomain = $credentials['PARENT_DOMAIN'] ?? null;
+    $sharingId = $credentials['SHARING_ID'] ?? null;
+    $authScheme = $credentials['AUTH_SCHEME'] ?? 'Bearer';
 
     // Cloudflare: API_KEY can be a token (leave EMAIL empty) or email:global_key.
     // For a separate global key, set both EMAIL and API_KEY.
@@ -129,6 +132,8 @@ try {
         'cloudns_auth_password' => $cloudnsAuthPassword,
         'project_id' => $projectId,
         'parent_domain' => $parentDomain,
+        'sharing_id' => $sharingId,
+        'auth_scheme' => $authScheme,
         // Optional PowerDNS/BIND secondary server options go here (see README).
     ];
 } catch (Exception $e) {
@@ -189,7 +194,7 @@ try {
     print_r($domain);
 
     // Step 2b: DNSSEC operations (Cloudflare, DNSimple and Vultr are now supported).
-    $dnssecProviders = ['Bunny', 'ClouDNS', 'Desec', 'PowerDNS', 'Scaleway', 'Cloudflare', 'DNSimple', 'Vultr'];
+    $dnssecProviders = ['Bunny', 'ClouDNS', 'Desec', 'GandiLiveDNS', 'PowerDNS', 'Scaleway', 'Cloudflare', 'DNSimple', 'Vultr'];
     if ($runDnssec && in_array($providerDisplay, $dnssecProviders, true)) {
         echo "Enabling DNSSEC...\n";
         $ds = $service->enableDNSSEC($config);
