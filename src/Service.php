@@ -277,11 +277,12 @@ class Service
         $domainName = $data['domain_name'];
         $query = "SELECT * FROM " . plexZonesTable() . " WHERE domain_name = :domain_name";
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
-        $domainId   = $domain[0]['id'];
 
         if (!$domain) {
-            throw new \RuntimeException("Domain does not exist.");
+            throw new ResourceNotFoundException("Domain does not exist.");
         }
+
+        $domainId = $domain[0]['id'];
 
         $this->chooseDnsProvider($data);
         if ($this->dnsProvider === null) {
@@ -418,7 +419,7 @@ class Service
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new \RuntimeException("Domain name or record ID is missing.");
+            throw new \InvalidArgumentException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -429,7 +430,7 @@ class Service
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
-            throw new \RuntimeException("Domain does not exist.");
+            throw new ResourceNotFoundException("Domain does not exist.");
         }
 
         $domainId = $domain[0]['id'];
@@ -439,7 +440,7 @@ class Service
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
-            throw new \RuntimeException("Record does not exist.");
+            throw new ResourceNotFoundException("Record does not exist.");
         }
         $providerRecordId = $record[0]['recordId'];
         // Older versions stored uniqid() placeholders when the provider returned no ID.
@@ -680,7 +681,7 @@ class Service
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new \RuntimeException("Domain name or record ID is missing.");
+            throw new \InvalidArgumentException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -691,7 +692,7 @@ class Service
         $domain = $this->fetchData($query, [':domain_name' => $domainName]);
 
         if (!$domain) {
-            throw new \RuntimeException("Domain does not exist.");
+            throw new ResourceNotFoundException("Domain does not exist.");
         }
 
         $domainId = $domain[0]['id'];
@@ -703,7 +704,7 @@ class Service
             [':record_id' => $recordId, ':domain_id' => $domainId]
         );
         if (!$record) {
-            throw new \RuntimeException("Record does not exist.");
+            throw new ResourceNotFoundException("Record does not exist.");
         }
 
         // Preserve metadata explicitly supplied by existing callers. The stored
@@ -736,11 +737,13 @@ class Service
         // performed before record_id-only deletion was introduced.
         if ($type === 'CAA') {
             $data['record_value'] = (string)$record[0]['value'];
-        } elseif ($data['provider'] === 'Hetzner') {
-            $data['record_value'] = (string)$record[0]['value'];
-            if (in_array($type, ['MX', 'SRV'], true)) {
-                $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
-            }
+        } elseif (in_array($data['provider'], ['Bind', 'PowerDNS', 'Hetzner'], true)
+            && in_array($type, ['MX', 'SRV'], true)) {
+            // Local storage keeps MX/SRV priority separately. Providers that
+            // identify values by textual RDATA need the complete presentation
+            // value in order to delete the exact remote member.
+            $data['record_value'] = (int)$record[0]['priority']
+                . ' ' . (string)$record[0]['value'];
         }
         $providerRecordId = $record[0]['recordId'];
         // Older versions stored uniqid() placeholders when the provider returned no ID.
