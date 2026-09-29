@@ -64,6 +64,7 @@ function getProviderDisplayName(string $provider): string {
         'DIGITALOCEAN'=> 'DigitalOcean',
         'HETZNER'     => 'Hetzner',
         'POWERDNS'    => 'PowerDNS',
+        'SCALEWAY'    => 'Scaleway',
         'VULTR'       => 'Vultr',
     ];
 
@@ -76,7 +77,7 @@ $dotenv->load();
 
 // Demo creates/deletes a zone and uninstalls its tables: use a test zone/database.
 // Set PROVIDER in .env, or change the default below. Names match DNS_<PROVIDER>_*.
-// Examples: Hetzner, DigitalOcean, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
+// Examples: Hetzner, DigitalOcean, Scaleway, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
 $provider = $_ENV['PROVIDER'] ?? 'Desec';
 $domainName = 'example.com'; // Replace with your test domain.
 $runDnssec = true;          // Skipped for providers without implemented DNSSEC.
@@ -95,6 +96,8 @@ try {
     $powerdnsip = $credentials['POWERDNS_IP'] ?? '127.0.0.1';
     $cloudnsAuthId = $credentials['AUTH_ID'] ?? null;
     $cloudnsAuthPassword = $credentials['AUTH_PASSWORD'] ?? null;
+    $projectId = $credentials['PROJECT_ID'] ?? null;
+    $parentDomain = $credentials['PARENT_DOMAIN'] ?? null;
 
     // Cloudflare: API_KEY can be a token (leave EMAIL empty) or email:global_key.
     // For a separate global key, set both EMAIL and API_KEY.
@@ -104,6 +107,10 @@ try {
     if ($providerDisplay === 'ClouDNS') {
         if (!$cloudnsAuthId || !$cloudnsAuthPassword) {
             throw new Exception('ClouDNS requires AUTH_ID and AUTH_PASSWORD.');
+        }
+    } elseif ($providerDisplay === 'Scaleway') {
+        if (!$apiKey || !$projectId) {
+            throw new Exception('Scaleway requires API_KEY and PROJECT_ID.');
         }
     } elseif (!$apiKey) {
         throw new Exception("Missing API Key for provider: $provider");
@@ -120,6 +127,8 @@ try {
         'powerdnsip' => $powerdnsip,
         'cloudns_auth_id' => $cloudnsAuthId,
         'cloudns_auth_password' => $cloudnsAuthPassword,
+        'project_id' => $projectId,
+        'parent_domain' => $parentDomain,
         // Optional PowerDNS/BIND secondary server options go here (see README).
     ];
 } catch (Exception $e) {
@@ -180,7 +189,7 @@ try {
     print_r($domain);
 
     // Step 2b: DNSSEC operations (Cloudflare, DNSimple and Vultr are now supported).
-    $dnssecProviders = ['Bunny', 'ClouDNS', 'Desec', 'PowerDNS', 'Cloudflare', 'DNSimple', 'Vultr'];
+    $dnssecProviders = ['Bunny', 'ClouDNS', 'Desec', 'PowerDNS', 'Scaleway', 'Cloudflare', 'DNSimple', 'Vultr'];
     if ($runDnssec && in_array($providerDisplay, $dnssecProviders, true)) {
         echo "Enabling DNSSEC...\n";
         $ds = $service->enableDNSSEC($config);
