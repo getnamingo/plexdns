@@ -60,6 +60,9 @@ class Service
             case 'DNSimple':
                 $this->dnsProvider = new Providers\DNSimple($config, $this->db);
                 break;
+            case 'DigitalOcean':
+                $this->dnsProvider = new Providers\DigitalOcean($config);
+                break;
             case 'Hetzner':
                 $this->dnsProvider = new Providers\Hetzner($config, $this->db);
                 break;
@@ -302,6 +305,15 @@ class Service
             $rrsetData['port'] = $data['record_port'];
         }
 
+        if ($data['record_type'] === 'CAA') {
+            if (array_key_exists('record_flags', $data)) {
+                $rrsetData['flags'] = (int)$data['record_flags'];
+            }
+            if (array_key_exists('record_tag', $data)) {
+                $rrsetData['tag'] = (string)$data['record_tag'];
+            }
+        }
+
         $useModify = false;
 
         if ($data['provider'] === 'Desec' && in_array($data['record_type'], ['A', 'TXT', 'MX'], true)) {
@@ -521,6 +533,15 @@ class Service
                 $rrsetData['port'] = $data['record_port'];
             }
 
+            if ($type === 'CAA') {
+                if (array_key_exists('record_flags', $data)) {
+                    $rrsetData['flags'] = (int)$data['record_flags'];
+                }
+                if (array_key_exists('record_tag', $data)) {
+                    $rrsetData['tag'] = (string)$data['record_tag'];
+                }
+            }
+
             try {
                 $this->dnsProvider->modifyRRset($domainName, $host, $type, $rrsetData);
             } catch (\Throwable $e) {
@@ -691,7 +712,7 @@ class Service
             // Default behaviour: delete whole RRset for non-deSEC or non-multi types
             try {
                 if (method_exists($this->dnsProvider, 'deleteRRset')) {
-                    if (in_array($data['provider'], ['Bunny', 'AnycastDNS', 'Cloudflare', 'ClouDNS', 'DNSimple', 'Hetzner', 'Vultr'], true)) {
+                    if (in_array($data['provider'], ['Bunny', 'AnycastDNS', 'Cloudflare', 'ClouDNS', 'DNSimple', 'DigitalOcean', 'Hetzner', 'Vultr'], true)) {
                         $this->dnsProvider->deleteRRset(
                             $domainName,
                             $host,
@@ -801,6 +822,7 @@ class Service
 
             'AnycastDNS',
             'Bind',
+            'DigitalOcean',
             'Hetzner' => [
                 'supported' => false,
                 'can_enable' => false,
