@@ -34,6 +34,10 @@ cp vendor/namingo/plexdns/demo.php .
 
 - Listing available DNS providers
 
+## HTTP API
+
+Cardo DNS also includes an optional Swoole-based HTTP API in [`api/`](api/), integrating the former `plexdns-api` service directly into this repository. See [`api.md`](api.md) for setup, endpoints, DNSSEC operations, systemd, and reverse-proxy examples.
+
 ## Supported Providers
 
 Most DNS providers **require an API key**, while some may need **additional settings** such as authentication credentials or specific server configurations. All required values must be set in the `.env` file.
