@@ -24,6 +24,7 @@ class Bunny implements DnsHostingProviderInterface
         'RDR'   => 5,
         'SRV'   => 8,
         'CAA'   => 9,
+        'PTR'   => 10,
         'NS'    => 12,
         'SVCB'  => 13,
         'HTTPS' => 14,
