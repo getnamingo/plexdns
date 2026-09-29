@@ -46,7 +46,12 @@ Most DNS providers **require an API key**, while some may need **additional sett
 | **DigitalOcean** | `API_KEY` | Personal access token with domain access | ✅ | ❌ |
 | **Hetzner** | `API_KEY` | Hetzner Console project token | ✅ | ❌ |
 | **PowerDNS** | `API_KEY:POWERDNS_IP` | [installer](bin/install-powerdns-ubuntu-26.04.sh) | ✅ | ✅ |
+| **Scaleway** | `API_KEY:PROJECT_ID` | Secret key + project ID; optional `PARENT_DOMAIN` for sub-zones | ✅ | ✅ |
 | **Vultr** | `API_KEY` | | ✅ | ✅ |
+
+### Scaleway notes
+
+Scaleway DNS requires both a secret API key and a Project ID. Root DNS zones are tied to the managed domain and cannot be deleted independently; sub-zones can be created/deleted normally. DNSSEC operations apply to the managed root domain, not to an individual delegated sub-zone. PlexDNS supports Scaleway record IDs, synchronization, BIND zone export, bulk record changes, and Scaleway's record types including ALIAS, TLSA, SSHFP, DS, NAPTR, DNAME, SVCB and HTTPS.
 
 ### Testing Provider
 
