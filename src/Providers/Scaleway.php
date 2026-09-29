@@ -660,6 +660,15 @@ class Scaleway implements DnsHostingProviderInterface
             }
         }
 
+        if ($type === 'CAA' && array_key_exists('tag', $rrsetData)) {
+            $flags = (int)($rrsetData['flags'] ?? 0);
+            $tag = strtolower(trim((string)$rrsetData['tag']));
+            if ($flags < 0 || $flags > 255 || !in_array($tag, ['issue', 'issuewild', 'iodef'], true)) {
+                throw new \InvalidArgumentException('Invalid CAA flags or tag.');
+            }
+            $data = $flags . ' ' . $tag . ' ' . $data;
+        }
+
         $payload = [
             'data' => $data,
             'name' => $name,
