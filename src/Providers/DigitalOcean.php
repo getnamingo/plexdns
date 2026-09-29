@@ -665,9 +665,12 @@ class DigitalOcean implements DnsHostingProviderInterface
     private function normalizeType(string $type): string
     {
         $type = strtoupper(trim($type));
+        $supported = ['A', 'AAAA', 'CAA', 'CNAME', 'MX', 'NS', 'PTR', 'TXT', 'SRV'];
 
-        if (!preg_match('/^[A-Z][A-Z0-9]*$/', $type)) {
-            throw new \InvalidArgumentException('Invalid DNS record type.');
+        if (!in_array($type, $supported, true)) {
+            throw new \InvalidArgumentException(
+                'Unsupported DigitalOcean DNS record type: ' . $type
+            );
         }
 
         return $type;
