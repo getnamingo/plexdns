@@ -119,6 +119,34 @@ expect(payload($history, 0)['changes'][0]['set']['id'] === 'record-42', 'Update 
 expect($p->deleteRRset('example.com', 'www', 'A', '192.0.2.42', 'record-42') === true, 'Record delete.');
 expect(payload($history, 1)['changes'][0] === ['delete' => ['id' => 'record-42']], 'Delete uses saved ID.');
 
+// set.records must preserve every requested RRset value.
+$history = [];
+$p = provider([response(['records' => []])], $history);
+expect($p->modifyRRset('example.com', 'www', 'A', [
+    'record_id' => 'record-multi',
+    'ttl' => 300,
+    'records' => ['192.0.2.10', '192.0.2.11'],
+]) === true, 'Multi-value RRset update.');
+$setRecords = payload($history, 0)['changes'][0]['set']['records'];
+expect(count($setRecords) === 2, 'Scaleway set must preserve all RRset values.');
+expect($setRecords[0]['data'] === '192.0.2.10' && $setRecords[1]['data'] === '192.0.2.11', 'Scaleway multi-value payload.');
+
+$history = [];
+$p = provider([response(['records' => []])], $history);
+expect($p->modifyBulkRRsets('example.com', [[
+    'subname' => '@',
+    'type' => 'CAA',
+    'record_id' => 'record-caa',
+    'ttl' => 300,
+    'flags' => 0,
+    'tag' => 'issue',
+    'records' => ['letsencrypt.org', 'pki.goog'],
+]]) === true, 'Bulk multi-value CAA update.');
+$bulkRecords = payload($history, 0)['changes'][0]['set']['records'];
+expect(count($bulkRecords) === 2, 'Bulk Scaleway set must preserve all RRset values.');
+expect($bulkRecords[0]['data'] === '0 issue letsencrypt.org', 'Scaleway CAA split fields are encoded.');
+expect($bulkRecords[1]['data'] === '0 issue pki.goog', 'Scaleway CAA encoding applies to every value.');
+
 // Full supported record family includes Scaleway-specific modern types.
 $history = [];
 $p = provider([], $history);

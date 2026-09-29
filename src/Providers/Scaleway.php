@@ -364,17 +364,21 @@ class Scaleway implements DnsHostingProviderInterface
         $type = $this->normalizeType((string)$type);
         $recordId = $this->resolveRecordId($dnsZone, $name, $type, $rrsetData);
 
-        if (!isset($rrsetData['records'][0])) {
-            throw new \InvalidArgumentException("No new value provided in rrsetData['records'][0].");
+        $records = $rrsetData['records'] ?? null;
+        if (!is_array($records) || $records === []) {
+            throw new \InvalidArgumentException("No new values provided in rrsetData['records'].");
         }
 
         $payloadData = $rrsetData;
         $payloadData['subname'] = $name;
         $payloadData['type'] = $type;
-        $record = $this->recordPayload($payloadData, (string)$rrsetData['records'][0]);
+        $providerRecords = [];
+        foreach ($records as $value) {
+            $providerRecords[] = $this->recordPayload($payloadData, (string)$value);
+        }
 
         $this->applyChanges($dnsZone, [
-            ['set' => ['id' => $recordId, 'records' => [$record]]],
+            ['set' => ['id' => $recordId, 'records' => $providerRecords]],
         ], false);
 
         return true;
@@ -397,18 +401,23 @@ class Scaleway implements DnsHostingProviderInterface
             $name = $this->normalizeRecordName((string)($item['subname'] ?? ''));
             $type = $this->normalizeType((string)($item['type'] ?? ''));
             $data = $item['rrsetData'] ?? $item;
-            if (!is_array($data) || !isset($data['records'][0])) {
+            $records = is_array($data) ? ($data['records'] ?? null) : null;
+            if (!is_array($data) || !is_array($records) || $records === []) {
                 throw new \InvalidArgumentException('Invalid RRset update data.');
             }
 
             $recordId = $this->resolveRecordId($dnsZone, $name, $type, $data);
             $data['subname'] = $name;
             $data['type'] = $type;
+            $providerRecords = [];
+            foreach ($records as $value) {
+                $providerRecords[] = $this->recordPayload($data, (string)$value);
+            }
 
             $changes[] = [
                 'set' => [
                     'id' => $recordId,
-                    'records' => [$this->recordPayload($data, (string)$data['records'][0])],
+                    'records' => $providerRecords,
                 ],
             ];
         }

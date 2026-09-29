@@ -504,7 +504,7 @@ class DigitalOcean implements DnsHostingProviderInterface
         string $type,
         string $value
     ): int {
-        $expectedData = $this->extractComparableData($type, $value);
+        $expectedRdata = $this->canonicalRdataFromValue($type, $value);
 
         foreach ($this->retrieveAllRRsets($domainName) as $record) {
             if (!is_array($record)) {
@@ -516,7 +516,7 @@ class DigitalOcean implements DnsHostingProviderInterface
             if ((string)($record['name'] ?? '') !== $subname) {
                 continue;
             }
-            if ((string)($record['data'] ?? '') !== $expectedData) {
+            if ($this->canonicalRdataFromRecord($record) !== $expectedRdata) {
                 continue;
             }
             if (!isset($record['id']) || !is_numeric($record['id'])) {
@@ -615,29 +615,40 @@ class DigitalOcean implements DnsHostingProviderInterface
         return $payload;
     }
 
-    private function extractComparableData(string $type, string $value): string
+    private function canonicalRdataFromValue(string $type, string $value): string
     {
         $value = trim($value);
 
-        if ($type === 'MX' && preg_match('/^\d+\s+(.+)$/', $value, $matches)) {
-            return trim($matches[1]);
-        }
+        return match ($type) {
+            'MX' => preg_match('/^(\d+)\s+(.+)$/', $value, $matches)
+                ? (int)$matches[1] . ' ' . trim($matches[2])
+                : $value,
+            'SRV' => preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/', $value, $matches)
+                ? (int)$matches[1] . ' ' . (int)$matches[2] . ' ' . (int)$matches[3] . ' ' . trim($matches[4])
+                : $value,
+            'CAA' => preg_match('/^(\d+)\s+(issue|issuewild|iodef)\s+(.+)$/i', $value, $matches)
+                ? (int)$matches[1] . ' ' . strtolower($matches[2]) . ' ' . trim($matches[3])
+                : $value,
+            default => $value,
+        };
+    }
 
-        if ($type === 'SRV') {
-            if (preg_match('/^\d+\s+\d+\s+\d+\s+(.+)$/', $value, $matches)) {
-                return trim($matches[1]);
-            }
-            if (preg_match('/^\d+\s+\d+\s+(.+)$/', $value, $matches)) {
-                return trim($matches[1]);
-            }
-        }
+    private function canonicalRdataFromRecord(array $record): string
+    {
+        $type = strtoupper((string)($record['type'] ?? ''));
+        $data = trim((string)($record['data'] ?? ''));
 
-        if ($type === 'CAA'
-            && preg_match('/^\d+\s+(?:issue|issuewild|iodef)\s+(.+)$/i', $value, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return $value;
+        return match ($type) {
+            'MX' => (int)($record['priority'] ?? 0) . ' ' . $data,
+            'SRV' => (int)($record['priority'] ?? 0)
+                . ' ' . (int)($record['weight'] ?? 0)
+                . ' ' . (int)($record['port'] ?? 0)
+                . ' ' . $data,
+            'CAA' => (int)($record['flags'] ?? 0)
+                . ' ' . strtolower((string)($record['tag'] ?? ''))
+                . ' ' . $data,
+            default => $data,
+        };
     }
 
     private function normalizeDomain(string $domainName): string
