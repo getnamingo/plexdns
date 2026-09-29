@@ -583,6 +583,14 @@ class Service
                 }
             }
 
+            if ($data['provider'] === 'PowerDNS' && in_array(strtoupper($type), ['SRV', 'CAA'], true)) {
+                // PowerDNS compares complete textual RDATA.
+                $rrsetData['old_value'] = $record[0]['value'];
+                if (strtoupper($type) === 'SRV') {
+                    $rrsetData['old_priority'] = (int)$record[0]['priority'];
+                }
+            }
+
             if ($type === 'MX') {
                 if ($data['provider'] === 'Desec') {
                     $rrsetData['records'] = [$data['record_priority'] . ' ' . $data['record_value']];

@@ -49,10 +49,10 @@ final class RecordValue
     {
         $value = trim($value);
 
-        if (preg_match('/^(\d+)\s+([A-Za-z0-9-]+)\s+(.+)$/', $value, $matches)) {
+        if (preg_match('/^(\d+)\s+([A-Za-z0-9-]+)\s+(.*)$/', $value, $matches)) {
             return (int)$matches[1]
                 . ' ' . strtolower($matches[2])
-                . ' ' . trim($matches[3]);
+                . ' ' . self::caaValue(trim($matches[3]));
         }
 
         $tag = strtolower(trim((string)($data['tag'] ?? '')));
@@ -65,7 +65,30 @@ final class RecordValue
             throw new \InvalidArgumentException('CAA flags must be between 0 and 255.');
         }
 
-        return $flags . ' ' . $tag . ' ' . $value;
+        return $flags . ' ' . $tag . ' ' . self::caaValue($value);
+    }
+
+    private static function caaValue(string $value): string
+    {
+        $value = trim($value);
+
+        if (strlen($value) >= 2
+            && $value[0] === '"'
+            && $value[strlen($value) - 1] === '"') {
+            return $value;
+        }
+
+        if ($value === '' || preg_match('/[;\s"\\\\]/', $value)) {
+            $escaped = str_replace(
+                ['\\', '"'],
+                ['\\\\', '\\"'],
+                $value
+            );
+
+            return '"' . $escaped . '"';
+        }
+
+        return $value;
     }
 
     public static function srv(

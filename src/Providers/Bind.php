@@ -254,6 +254,8 @@ class Bind implements DnsHostingProviderInterface {
 
         if (in_array($typeUpper, ['TXT', 'SPF'], true)) {
             $value = $this->stripOuterQuotes($value);
+        } elseif ($typeUpper === 'CAA') {
+            $value = RecordValue::content($typeUpper, (string)$value);
         }
 
         $record = [
