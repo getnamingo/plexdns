@@ -22,7 +22,11 @@ final class PowerDNSServiceFake
         return true;
     }
 
-    public function deleteRRset($domain, $name, $type, $value): bool { return true; }
+    public function deleteRRset($domain, $name, $type, $value): bool
+    {
+        self::$calls[] = ['delete', $name, $type, $value];
+        return true;
+    }
 }
 
 class_alias(PowerDNSServiceFake::class, 'Namingo\Cardo\DNS\\Providers\\PowerDNS');
@@ -71,4 +75,30 @@ expect($call[3]['old_value'] === '20 5060 sip-old.example.com.', 'Old local SRV 
 expect($call[3]['old_priority'] === 10, 'Old SRV priority forwarded separately.');
 expect($call[3]['priority'] === 30, 'New SRV priority remains separate.');
 
-echo "PowerDNS Service structured update checks passed.\n";
+
+$deleteId = $service->addRecord([
+    'provider' => 'PowerDNS',
+    'domain_name' => 'example.com',
+    'record_name' => '_xmpp._tcp',
+    'record_type' => 'SRV',
+    'record_value' => 'xmpp.example.com.',
+    'record_priority' => 5,
+    'record_weight' => 10,
+    'record_port' => 5222,
+    'record_ttl' => 300,
+]);
+
+$service->delRecord([
+    'provider' => 'PowerDNS',
+    'domain_name' => 'example.com',
+    'record_id' => $deleteId,
+]);
+
+$deleteCall = PowerDNSServiceFake::$calls[array_key_last(PowerDNSServiceFake::$calls)];
+expect($deleteCall[0] === 'delete', 'Expected PowerDNS delete call.');
+expect(
+    $deleteCall[3] === '5 10 5222 xmpp.example.com.',
+    'PowerDNS SRV deletion must use complete priority/weight/port/target RDATA.'
+);
+
+echo "PowerDNS Service structured update/delete checks passed.\n";
