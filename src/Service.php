@@ -476,7 +476,11 @@ class Service
             $records = [];
             foreach ($rows as $row) {
                 if ((string)$row['id'] === (string)$recordId) {
-                    $records[] = $this->canonicalLocalRecordValue($data);
+                    $newValue = $this->canonicalLocalRecordValue($data);
+                    if ($type === 'MX' || $type === 'SRV') {
+                        $newValue = (int)($data['record_priority'] ?? 0) . ' ' . $newValue;
+                    }
+                    $records[] = $newValue;
                 } else {
                     $records[] = $type === 'MX'
                         ? (int)$row['priority'] . ' ' . $row['value']
