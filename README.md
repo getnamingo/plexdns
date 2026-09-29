@@ -1,10 +1,22 @@
-# PlexDNS - Multi-Provider DNS Management Tool
+# Cardo DNS - Multi-Provider DNS Management Tool
 
-PlexDNS is a **unified, multi-provider DNS management tool** that allows users to manage DNS zones and records across multiple DNS hosting providers using a common interface.
+Cardo DNS is a **unified, multi-provider DNS management tool** that allows users to manage DNS zones and records across multiple DNS hosting providers using a common interface.
+
+## Namespace and compatibility
+
+The canonical PHP namespace is:
+
+```php
+Namingo\Cardo\DNS
+```
+
+The Composer package name intentionally remains `namingo/plexdns` for installation compatibility.
+
+Existing applications using the historical `PlexDNS\...` namespace remain supported automatically through Composer. New integrations should use `Namingo\Cardo\DNS\...`.
 
 ## Installation
 
-1. **Go to your project directory** and install PlexDNS via **Composer**:
+1. **Go to your project directory** and install Cardo DNS via **Composer**:
 
 ```sh
 cd /path/to/your/project
@@ -52,24 +64,24 @@ Most DNS providers **require an API key**, while some may need **additional sett
 
 ### Gandi LiveDNS notes
 
-Gandi LiveDNS uses RRsets, so PlexDNS preserves sibling values when adding, updating, or deleting one local record. Personal Access Token Bearer authentication is the default; legacy `Apikey` authentication can be selected with `AUTH_SCHEME=Apikey`. `SHARING_ID` is supported for organization sharing contexts. LiveDNS DNSSEC status and DS data are supported. The LiveDNS API can add a domain but does not expose a matching remove-domain operation, so provider-side domain removal is reported as unsupported rather than silently faked.
+Gandi LiveDNS uses RRsets, so Cardo DNS preserves sibling values when adding, updating, or deleting one local record. Personal Access Token Bearer authentication is the default; legacy `Apikey` authentication can be selected with `AUTH_SCHEME=Apikey`. `SHARING_ID` is supported for organization sharing contexts. LiveDNS DNSSEC status and DS data are supported. The LiveDNS API can add a domain but does not expose a matching remove-domain operation, so provider-side domain removal is reported as unsupported rather than silently faked.
 
 ### Scaleway notes
 
-Scaleway DNS requires both a secret API key and a Project ID. Root DNS zones are tied to the managed domain and cannot be deleted independently; sub-zones can be created/deleted normally. DNSSEC operations apply to the managed root domain, not to an individual delegated sub-zone. PlexDNS supports Scaleway record IDs, synchronization, BIND zone export, bulk record changes, and Scaleway's record types including ALIAS, TLSA, SSHFP, DS, NAPTR, DNAME, SVCB and HTTPS.
+Scaleway DNS requires both a secret API key and a Project ID. Root DNS zones are tied to the managed domain and cannot be deleted independently; sub-zones can be created/deleted normally. DNSSEC operations apply to the managed root domain, not to an individual delegated sub-zone. Cardo DNS supports Scaleway record IDs, synchronization, BIND zone export, bulk record changes, and Scaleway's record types including ALIAS, TLSA, SSHFP, DS, NAPTR, DNAME, SVCB and HTTPS.
 
 ### Important record types
 
-PlexDNS normalizes structured **CAA** and **SRV** input across provider APIs so the same Service fields produce valid provider records. Standard presentation-format records such as **TLSA**, **SSHFP**, **HTTPS/SVCB**, **NAPTR**, **DS**, and **PTR** are passed through where the upstream provider supports them; providers with structured APIs are mapped explicitly. Provider-side limitations still apply, so PlexDNS does not advertise record types that the upstream DNS service cannot create.
+Cardo DNS normalizes structured **CAA** and **SRV** input across provider APIs so the same Service fields produce valid provider records. Standard presentation-format records such as **TLSA**, **SSHFP**, **HTTPS/SVCB**, **NAPTR**, **DS**, and **PTR** are passed through where the upstream provider supports them; providers with structured APIs are mapped explicitly. Provider-side limitations still apply, so Cardo DNS does not advertise record types that the upstream DNS service cannot create.
 
 ### Testing Provider
 
-`PlexDNS\Providers\Testing` lets projects exercise `PlexDNS\Service` without
+`Namingo\Cardo\DNS\Providers\Testing` lets projects exercise `Namingo\Cardo\DNS\Service` without
 contacting a DNS provider. Use it only with a fresh in-memory SQLite connection:
 
 ```php
 $pdo = new PDO('sqlite::memory:');
-$service = new PlexDNS\Service($pdo);
+$service = new Namingo\Cardo\DNS\Service($pdo);
 $service->install();
 
 $config = ['provider' => 'Testing'];
@@ -121,7 +133,7 @@ We extend our gratitude to:
 - [QCloudns API Client](https://github.com/sussdorf/qcloudns) which served as inspiration for our ClouDNS module.
 
 ## License
-PlexDNS is licensed under the **MIT License**.
+Cardo DNS is licensed under the **MIT License**.
 
 ## Contributing
 We welcome contributions! Feel free to submit **issues** or **pull requests** to improve the project.
