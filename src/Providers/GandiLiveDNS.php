@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PlexDNS\Providers;
+namespace Namingo\Cardo\DNS\Providers;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -158,7 +158,7 @@ class GandiLiveDNS implements DnsHostingProviderInterface
     {
         $this->normalizeDomain($domainName);
 
-        throw new \PlexDNS\UnsupportedProviderException(
+        throw new \Namingo\Cardo\DNS\UnsupportedProviderException(
             'Gandi LiveDNS does not expose an API operation to remove a domain from LiveDNS.'
         );
     }
