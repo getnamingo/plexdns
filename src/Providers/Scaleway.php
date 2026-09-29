@@ -154,15 +154,11 @@ class Scaleway implements DnsHostingProviderInterface
     public function exportDomainAsZonefile($domainName)
     {
         $dnsZone = $this->normalizeDomain((string)$domainName);
-        $body = $this->request('GET', 'dns-zones/' . rawurlencode($dnsZone) . '/raw', [
+
+        return $this->requestRaw('GET', 'dns-zones/' . rawurlencode($dnsZone) . '/raw', [
             'query' => ['format' => 'bind'],
+            'headers' => ['Accept' => 'text/plain'],
         ]);
-
-        if (!isset($body['content']) || !is_string($body['content'])) {
-            throw new \RuntimeException('Scaleway API did not return a BIND zone file.');
-        }
-
-        return $body['content'];
     }
 
     public function deleteDomain($domainName)
@@ -850,6 +846,17 @@ class Scaleway implements DnsHostingProviderInterface
         } while (($total !== null && count($all) < $total) || ($total === null && count($items) === $pageSize));
 
         return $all;
+    }
+
+    private function requestRaw(string $method, string $path, array $options = []): string
+    {
+        try {
+            $response = $this->client->request($method, ltrim($path, '/'), $options);
+        } catch (RequestException $e) {
+            throw new \RuntimeException('Scaleway API request failed: ' . $e->getMessage(), 0, $e);
+        }
+
+        return (string)$response->getBody();
     }
 
     private function request(string $method, string $path, array $options = []): array
