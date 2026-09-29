@@ -98,9 +98,11 @@ class AnycastDNS implements DnsHostingProviderInterface {
         $content = is_array($rrsetData['records'])
             ? (string) reset($rrsetData['records'])
             : (string) $rrsetData['records'];
+        $type = strtoupper((string)$rrsetData['type']);
+        $content = RecordValue::content($type, $content, $rrsetData);
 
         $params = [
-            'type'    => strtoupper($rrsetData['type']),
+            'type'    => $type,
             'name'    => $subname,
             'content' => $content,
             'ttl'     => (int) $rrsetData['ttl'],
@@ -146,6 +148,7 @@ class AnycastDNS implements DnsHostingProviderInterface {
         $content = is_array($rrsetData['records'])
             ? (string) reset($rrsetData['records'])
             : (string) $rrsetData['records'];
+        $content = RecordValue::content(strtoupper((string)$type), $content, $rrsetData);
 
         $lookupContent = (isset($rrsetData['old_value']) && $rrsetData['old_value'] !== '')
             ? (string) $rrsetData['old_value']
