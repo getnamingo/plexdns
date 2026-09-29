@@ -1,0 +1,22 @@
+[Unit]
+Description=Cardo DNS API Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/cardo-dns
+ExecStart=/usr/bin/php /opt/cardo-dns/api/start_api.php
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cardo-dns-api
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
