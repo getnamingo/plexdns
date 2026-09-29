@@ -1,0 +1,56 @@
+# Cardo DNS API
+API_PROVIDER=DigitalOcean
+API_TOKEN=replace-with-a-long-random-token
+API_HOST=127.0.0.1
+API_PORT=9501
+API_LOG_PATH=/var/log/cardo-dns/api.log
+
+# Database: mysql, pgsql, or sqlite
+DB_TYPE=mysql
+DB_HOST=127.0.0.1
+DB_NAME=cardodns
+DB_USER=cardodns
+DB_PASS=change-me
+SQLITE_PATH=database.sqlite
+
+# Configure the credentials for API_PROVIDER. The full provider list and
+# credential names are also documented in the main env-sample.
+DNS_ANYCASTDNS_API_KEY=
+
+DNS_BIND_API_KEY=
+DNS_BIND_BIND_IP=127.0.0.1
+# Optional secondary servers:
+# DNS_BIND_API_KEY_NS2=
+# DNS_BIND_BIND_IP_NS2=
+
+DNS_BUNNY_API_KEY=
+
+# Cloudflare: API_KEY may be an API token. For a global API key, also set EMAIL.
+DNS_CLOUDFLARE_EMAIL=
+DNS_CLOUDFLARE_API_KEY=
+
+DNS_CLOUDNS_AUTH_ID=
+DNS_CLOUDNS_AUTH_PASSWORD=
+
+DNS_DESEC_API_KEY=
+DNS_DNSIMPLE_API_KEY=
+DNS_DIGITALOCEAN_API_KEY=
+
+DNS_GANDILIVEDNS_API_KEY=
+DNS_GANDILIVEDNS_SHARING_ID=
+DNS_GANDILIVEDNS_AUTH_SCHEME=Bearer
+
+DNS_HETZNER_API_KEY=
+
+DNS_POWERDNS_API_KEY=
+DNS_POWERDNS_POWERDNS_IP=127.0.0.1
+DNS_POWERDNS_PDNS_MASTER_IP=
+# Optional secondary servers:
+# DNS_POWERDNS_API_KEY_NS2=
+# DNS_POWERDNS_POWERDNS_IP_NS2=
+
+DNS_SCALEWAY_API_KEY=
+DNS_SCALEWAY_PROJECT_ID=
+DNS_SCALEWAY_PARENT_DOMAIN=
+
+DNS_VULTR_API_KEY=
