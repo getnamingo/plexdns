@@ -270,6 +270,9 @@ class Hetzner implements DnsHostingProviderInterface {
             }
             return (int)$parts[1] . ' ' . strtolower(rtrim($parts[2], '.')) . '.';
         }
+        if ($type === 'CAA') {
+            return RecordValue::content($type, $value, $data);
+        }
         if ($type === 'SRV') {
             if (!preg_match('/^\d+\s+\d+\s+\d+\s+/', $value)) {
                 if (!isset($data['priority'], $data['weight'], $data['port'])) {

@@ -58,6 +58,10 @@ Gandi LiveDNS uses RRsets, so PlexDNS preserves sibling values when adding, upda
 
 Scaleway DNS requires both a secret API key and a Project ID. Root DNS zones are tied to the managed domain and cannot be deleted independently; sub-zones can be created/deleted normally. DNSSEC operations apply to the managed root domain, not to an individual delegated sub-zone. PlexDNS supports Scaleway record IDs, synchronization, BIND zone export, bulk record changes, and Scaleway's record types including ALIAS, TLSA, SSHFP, DS, NAPTR, DNAME, SVCB and HTTPS.
 
+### Important record types
+
+PlexDNS normalizes structured **CAA** and **SRV** input across provider APIs so the same Service fields produce valid provider records. Standard presentation-format records such as **TLSA**, **SSHFP**, **HTTPS/SVCB**, **NAPTR**, **DS**, and **PTR** are passed through where the upstream provider supports them; providers with structured APIs are mapped explicitly. Provider-side limitations still apply, so PlexDNS does not advertise record types that the upstream DNS service cannot create.
+
 ### Testing Provider
 
 `PlexDNS\Providers\Testing` lets projects exercise `PlexDNS\Service` without

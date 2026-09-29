@@ -92,7 +92,11 @@ class DNSimple implements DnsHostingProviderInterface {
             }
 
             if (!empty($rrsetData['records'])) {
-                $record['content'] = (string)$rrsetData['records'][0];
+                $record['content'] = RecordValue::content(
+                    strtoupper((string)($rrsetData['type'] ?? '')),
+                    (string)$rrsetData['records'][0],
+                    $rrsetData
+                );
             }
 
             if (isset($rrsetData['ttl'])) {
@@ -151,7 +155,11 @@ class DNSimple implements DnsHostingProviderInterface {
             }
 
             if (!empty($rrsetData['records'])) {
-                $record['content'] = (string)$rrsetData['records'][0];
+                $record['content'] = RecordValue::content(
+                    strtoupper((string)$type),
+                    (string)$rrsetData['records'][0],
+                    $rrsetData
+                );
             }
 
             if (isset($rrsetData['ttl'])) {

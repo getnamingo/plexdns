@@ -80,10 +80,14 @@ class Vultr implements DnsHostingProviderInterface {
             if (isset($rrsetData['subname'])) {
                 $record->setName($rrsetData['subname']);
             }
-            if (isset($rrsetData['records'])) {
-                $record->setData($rrsetData['records'][0]);
-            }
             $type = strtoupper($rrsetData['type']);
+            if (isset($rrsetData['records'])) {
+                $record->setData(RecordValue::content(
+                    $type,
+                    (string)$rrsetData['records'][0],
+                    $rrsetData
+                ));
+            }
             if (in_array($type, ['MX', 'SRV'], true)) {
                 $priority = isset($rrsetData['priority']) ? (int)$rrsetData['priority'] : 10;
                 $record->setPriority($priority);
@@ -162,7 +166,11 @@ class Vultr implements DnsHostingProviderInterface {
             $record->setName($subname);
 
             if (!empty($rrsetData['records'][0])) {
-                $record->setData($rrsetData['records'][0]);
+                $record->setData(RecordValue::content(
+                    strtoupper((string)$type),
+                    (string)$rrsetData['records'][0],
+                    $rrsetData
+                ));
             }
 
             if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {

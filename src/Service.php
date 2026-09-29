@@ -697,7 +697,11 @@ class Service
         if (!$record) {
             throw new \RuntimeException("Record does not exist.");
         }
-        if ($data['provider'] === 'Hetzner') {
+        if (strtoupper($type) === 'CAA') {
+            // CAA is stored locally as complete canonical RDATA (flags tag value).
+            // Use that value for provider matching/deletion even when callers use split fields.
+            $data['record_value'] = $record[0]['value'];
+        } elseif ($data['provider'] === 'Hetzner') {
             $data['record_value'] = $record[0]['value'];
             if (in_array(strtoupper($type), ['MX', 'SRV'], true)) {
                 $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];

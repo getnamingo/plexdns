@@ -320,6 +320,10 @@ class PowerDNS implements DnsHostingProviderInterface {
                 $prio = (int)$rrsetData['priority'];
                 $host = rtrim($value, '.');
                 $value = $prio . ' ' . $host . '.';
+            } elseif ($type === 'SRV') {
+                $value = RecordValue::content($type, $value, $rrsetData, true);
+            } elseif ($type === 'CAA') {
+                $value = RecordValue::content($type, $value, $rrsetData);
             }
 
             if (!in_array($value, $mergedValues, true)) {
@@ -431,6 +435,10 @@ class PowerDNS implements DnsHostingProviderInterface {
         if ($type === 'MX' && isset($rrsetData['priority'])) {
             $prio = (int)$rrsetData['priority'];
             $new  = $prio . ' ' . $new . '.';
+        } elseif ($type === 'SRV') {
+            $new = RecordValue::content($type, $new, $rrsetData, true);
+        } elseif ($type === 'CAA') {
+            $new = RecordValue::content($type, $new, $rrsetData);
         }
 
         $mergedValues = [];

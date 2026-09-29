@@ -100,11 +100,12 @@ class ClouDNS implements DnsHostingProviderInterface {
             'ttl'         => (int)$rrsetData['ttl'],
         ];
 
-        if (strtoupper($rrsetData['type']) === 'MX') {
-            $params['priority'] = isset($rrsetData['priority'])
-                ? (int)$rrsetData['priority']
-                : 10; // sensible default
-        }
+        $this->applyRecordFields(
+            $params,
+            strtoupper((string)$rrsetData['type']),
+            (string)$rrsetData['records'][0],
+            $rrsetData
+        );
 
         $response = $this->request('add-record.json', $params);
 
@@ -177,11 +178,12 @@ class ClouDNS implements DnsHostingProviderInterface {
             'ttl'         => (int)$rrsetData['ttl'],
         ];
 
-        if (strtoupper($type) === 'MX') {
-            $params['priority'] = isset($rrsetData['priority'])
-                ? (int)$rrsetData['priority']
-                : 10; // default
-        }
+        $this->applyRecordFields(
+            $params,
+            strtoupper((string)$type),
+            $targetRecord,
+            $rrsetData
+        );
 
         $response = $this->request('mod-record.json', $params);
 
@@ -227,6 +229,75 @@ class ClouDNS implements DnsHostingProviderInterface {
 
     public function deleteBulkRRsets($domainName, $rrsetDataArray) {
         throw new \Exception("Not yet implemented");
+    }
+
+    private function applyRecordFields(
+        array &$params,
+        string $type,
+        string $value,
+        array $data
+    ): void {
+        $value = trim($value);
+
+        if ($type === 'MX') {
+            $params['priority'] = isset($data['priority']) ? (int)$data['priority'] : 10;
+            return;
+        }
+
+        if ($type === 'SRV') {
+            if (preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/', $value, $m)) {
+                $params['priority'] = (int)$m[1];
+                $params['weight'] = (int)$m[2];
+                $params['port'] = (int)$m[3];
+                $params['record'] = trim($m[4]);
+            } else {
+                $params['priority'] = (int)($data['priority'] ?? 0);
+                $params['weight'] = (int)($data['weight'] ?? 0);
+                $params['port'] = (int)($data['port'] ?? 0);
+                $params['record'] = $value;
+            }
+            return;
+        }
+
+        if ($type === 'CAA') {
+            if (preg_match('/^(\d+)\s+([A-Za-z0-9-]+)\s+(.+)$/', $value, $m)) {
+                $params['caa_flag'] = (int)$m[1];
+                $params['caa_type'] = strtolower($m[2]);
+                $params['caa_value'] = trim($m[3], '"');
+            } else {
+                $params['caa_flag'] = (int)($data['flags'] ?? 0);
+                $params['caa_type'] = strtolower(trim((string)($data['tag'] ?? '')));
+                $params['caa_value'] = trim($value, '"');
+            }
+            $params['record'] = $params['caa_value'];
+            return;
+        }
+
+        if ($type === 'SSHFP'
+            && preg_match('/^(\d+)\s+(\d+)\s+(.+)$/', $value, $m)) {
+            $params['algorithm'] = (int)$m[1];
+            $params['fp_type'] = (int)$m[2];
+            $params['record'] = trim($m[3]);
+            return;
+        }
+
+        if ($type === 'TLSA'
+            && preg_match('/^(\d+)\s+(\d+)\s+(\d+)\s+(.+)$/', $value, $m)) {
+            $params['tlsa_usage'] = (int)$m[1];
+            $params['tlsa_selector'] = (int)$m[2];
+            $params['tlsa_matching_type'] = (int)$m[3];
+            $params['record'] = trim($m[4]);
+            return;
+        }
+
+        if (in_array($type, ['HTTPS', 'SVCB'], true)
+            && preg_match('/^(\d+)\s+(\S+)(?:\s+(.*))?$/', $value, $m)) {
+            $params['priority'] = (int)$m[1];
+            $params['record'] = $m[2];
+            if (isset($m[3]) && trim($m[3]) !== '') {
+                $params['parameters'] = trim($m[3]);
+            }
+        }
     }
 
     public function enableDNSSEC(string $domainName): array
