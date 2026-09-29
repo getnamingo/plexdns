@@ -240,8 +240,12 @@ function cardoApiPdo(string $root): PDO
 
     if ($dbType === 'sqlite') {
         $configuredPath = trim((string)($_ENV['SQLITE_PATH'] ?? 'database.sqlite'));
-        $sqlitePath = str_starts_with($configuredPath, '/') ? $configuredPath : $root . '/' . $configuredPath;
-        $dsn = 'sqlite:' . $sqlitePath;
+        if ($configuredPath === ':memory:') {
+            $dsn = 'sqlite::memory:';
+        } else {
+            $sqlitePath = str_starts_with($configuredPath, '/') ? $configuredPath : $root . '/' . $configuredPath;
+            $dsn = 'sqlite:' . $sqlitePath;
+        }
         $username = '';
         $password = '';
     } elseif ($dbType === 'mysql') {
