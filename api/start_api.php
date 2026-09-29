@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
+use Namingo\Cardo\DNS\RequestValidationException;
 use Namingo\Cardo\DNS\ResourceNotFoundException;
 use Namingo\Cardo\DNS\Service;
 use Swoole\Http\Request;
@@ -265,7 +266,7 @@ $server->on('request', function (Request $request, Response $response) use ($api
         }
 
         cardoApiRespond($response, 404, ['error' => 'Endpoint not found']);
-    } catch (InvalidArgumentException $e) {
+    } catch (InvalidArgumentException|RequestValidationException $e) {
         cardoApiRespond($response, 400, ['error' => $e->getMessage()]);
     } catch (ResourceNotFoundException $e) {
         cardoApiRespond($response, 404, ['error' => $e->getMessage()]);
