@@ -25,7 +25,7 @@ final class PowerDNSServiceFake
     public function deleteRRset($domain, $name, $type, $value): bool { return true; }
 }
 
-class_alias(PowerDNSServiceFake::class, 'PlexDNS\\Providers\\PowerDNS');
+class_alias(PowerDNSServiceFake::class, 'Namingo\Cardo\DNS\\Providers\\PowerDNS');
 
 function expect(bool $condition, string $message): void
 {
@@ -34,7 +34,7 @@ function expect(bool $condition, string $message): void
 
 $db = new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$service = new PlexDNS\Service($db);
+$service = new Namingo\Cardo\DNS\Service($db);
 $service->install();
 
 $db->exec("INSERT INTO " . plexZonesTable() . " (client_id, config, domain_name, created_at, updated_at)
