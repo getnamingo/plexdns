@@ -61,6 +61,7 @@ function getProviderDisplayName(string $provider): string {
         'CLOUDNS'     => 'ClouDNS',
         'DESEC'       => 'Desec',
         'DNSIMPLE'    => 'DNSimple',
+        'DIGITALOCEAN'=> 'DigitalOcean',
         'HETZNER'     => 'Hetzner',
         'POWERDNS'    => 'PowerDNS',
         'VULTR'       => 'Vultr',
@@ -75,7 +76,7 @@ $dotenv->load();
 
 // Demo creates/deletes a zone and uninstalls its tables: use a test zone/database.
 // Set PROVIDER in .env, or change the default below. Names match DNS_<PROVIDER>_*.
-// Examples: Hetzner, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
+// Examples: Hetzner, DigitalOcean, Cloudflare, DNSimple, Vultr, Bunny, ClouDNS, Desec, Bind, PowerDNS.
 $provider = $_ENV['PROVIDER'] ?? 'Desec';
 $domainName = 'example.com'; // Replace with your test domain.
 $runDnssec = true;          // Skipped for providers without implemented DNSSEC.
