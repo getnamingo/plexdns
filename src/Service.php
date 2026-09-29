@@ -419,7 +419,7 @@ class Service
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new \InvalidArgumentException("Domain name or record ID is missing.");
+            throw new RequestValidationException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
@@ -681,7 +681,7 @@ class Service
     {
         // Validate the input
         if (empty($data['domain_name']) || !array_key_exists('record_id', $data)) {
-            throw new \InvalidArgumentException("Domain name or record ID is missing.");
+            throw new RequestValidationException("Domain name or record ID is missing.");
         }
 
         $domainName = $data['domain_name'];
