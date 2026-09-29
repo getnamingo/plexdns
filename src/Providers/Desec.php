@@ -107,7 +107,7 @@ class Desec implements DnsHostingProviderInterface {
         $subname = $subname ?: '@';
         $rrsetData['subname'] = $subname;
         $rrsetData['type'] = strtoupper((string)$type);
-        $rrsetData = $this->normalizeRRsetData($rrsetData);
+        $rrsetData = $this->normalizeRRsetData($rrsetData, false);
 
         $response = $this->client->request('PATCH', $domainName . '/rrsets/' . $subname . '/' . $type . '/', [
             'headers' => $this->headers,
@@ -146,7 +146,7 @@ class Desec implements DnsHostingProviderInterface {
         return $response->getStatusCode() === 204;
     }
 
-    private function normalizeRRsetData(array $data): array
+    private function normalizeRRsetData(array $data, bool $includeIdentity = true): array
     {
         $type = strtoupper((string)($data['type'] ?? ''));
         $records = $data['records'] ?? [];
@@ -155,21 +155,26 @@ class Desec implements DnsHostingProviderInterface {
             throw new \InvalidArgumentException("RRset 'records' must be an array.");
         }
 
-        $data['type'] = $type;
-        $data['records'] = array_map(
-            fn($value) => RecordValue::content(
-                $type,
-                (string)$value,
-                $data,
-                $type === 'SRV',
-                $type === 'MX'
+        $normalized = [
+            'ttl' => (int)($data['ttl'] ?? 3600),
+            'records' => array_map(
+                fn($value) => RecordValue::content(
+                    $type,
+                    (string)$value,
+                    $data,
+                    $type === 'SRV',
+                    $type === 'MX'
+                ),
+                $records
             ),
-            $records
-        );
+        ];
 
-        unset($data['priority'], $data['weight'], $data['port'], $data['flags'], $data['tag']);
+        if ($includeIdentity) {
+            $normalized['subname'] = (string)($data['subname'] ?? '@');
+            $normalized['type'] = $type;
+        }
 
-        return $data;
+        return $normalized;
     }
 
     public function enableDNSSEC(string $domainName): array
