@@ -706,16 +706,41 @@ class Service
             throw new \RuntimeException("Record does not exist.");
         }
 
-        $type = strtoupper((string)$record[0]['type']);
-        $host = (string)$record[0]['host'];
+        // Preserve metadata explicitly supplied by existing callers. The stored
+        // row is only a fallback so record_id-only callers (such as the HTTP API)
+        // do not need to repeat the record identity.
+        $storedType = strtoupper((string)$record[0]['type']);
+        $storedHost = (string)$record[0]['host'];
+
+        $type = isset($data['record_type']) && trim((string)$data['record_type']) !== ''
+            ? strtoupper((string)$data['record_type'])
+            : $storedType;
+        $host = array_key_exists('record_name', $data) && $data['record_name'] !== null
+            ? (string)$data['record_name']
+            : $storedHost;
+
         $data['record_type'] = $type;
         $data['record_name'] = $host;
-        $data['record_value'] = (string)$record[0]['value'];
-        $data['record_ttl'] = (int)($record[0]['ttl'] ?? 0);
-        $data['record_priority'] = (int)($record[0]['priority'] ?? 0);
 
-        if ($data['provider'] === 'Hetzner' && in_array($type, ['MX', 'SRV'], true)) {
-            $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
+        if (!array_key_exists('record_value', $data) || $data['record_value'] === null) {
+            $data['record_value'] = (string)$record[0]['value'];
+        }
+        if (!array_key_exists('record_ttl', $data) || $data['record_ttl'] === null) {
+            $data['record_ttl'] = (int)($record[0]['ttl'] ?? 0);
+        }
+        if (!array_key_exists('record_priority', $data) || $data['record_priority'] === null) {
+            $data['record_priority'] = (int)($record[0]['priority'] ?? 0);
+        }
+
+        // Preserve the provider-specific canonicalization that delRecord already
+        // performed before record_id-only deletion was introduced.
+        if ($type === 'CAA') {
+            $data['record_value'] = (string)$record[0]['value'];
+        } elseif ($data['provider'] === 'Hetzner') {
+            $data['record_value'] = (string)$record[0]['value'];
+            if (in_array($type, ['MX', 'SRV'], true)) {
+                $data['record_value'] = (int)$record[0]['priority'] . ' ' . $data['record_value'];
+            }
         }
         $providerRecordId = $record[0]['recordId'];
         // Older versions stored uniqid() placeholders when the provider returned no ID.
